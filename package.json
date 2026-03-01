@@ -1,6 +1,6 @@
 {
   "name": "indesign-mcp-server",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A comprehensive Model Context Protocol (MCP) server for Adobe InDesign automation with 50+ professional tools including document management, text/graphics creation, style management, and image scaling",
   "main": "src/index.js",
   "type": "module",
@@ -8,7 +8,7 @@
     "start": "node src/index.js",
     "dev": "node --inspect src/index.js",
     "build": "echo 'No build step required for Node.js'",
-    "test": "echo 'No tests specified'"
+    "test": "node tests/test-all-handlers.js"
   },
   "keywords": [
     "mcp",
@@ -28,7 +28,7 @@
   "author": "lucdesign",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0"
+    "@modelcontextprotocol/sdk": "^1.27.1"
   },
   "engines": {
     "node": ">=18.0.0"

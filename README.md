@@ -1,5 +1,7 @@
 # InDesign UXP MCP Server
 
+> **Forked from** [zachshallbetter/indesign-mcp-server](https://github.com/zachshallbetter/indesign-mcp-server) — rewritten to use Adobe's UXP plugin platform instead of AppleScript.
+
 A Model Context Protocol (MCP) server that gives AI assistants direct, native control over Adobe InDesign via a UXP plugin bridge. ~130 tools covering the full InDesign feature set — documents, pages, text, graphics, styles, master spreads, books, and export.
 
 ---

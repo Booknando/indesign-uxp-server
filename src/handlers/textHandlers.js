@@ -132,64 +132,53 @@ export class TextHandlers {
             alignment
         } = args;
 
-        const escapedContent = content ? escapeJsxString(content) : '';
-        const escapedFontName = fontName ? escapeJsxString(fontName) : '';
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '',
-            '  try {',
-            `    if (${frameIndex} >= page.textFrames.length) {`,
-            '      "Text frame index out of range";',
-            '    } else {',
-            `      var textFrame = page.textFrames[${frameIndex}];`,
-            '',
-            `      if ("${escapedContent}" !== "") {`,
-            `        textFrame.contents = "${escapedContent}";`,
-            '      }',
-            '',
-            `      if (${fontSize}) {`,
-            `        textFrame.texts[0].pointSize = ${fontSize};`,
-            '      }',
-            '',
-            `      if ("${escapedFontName}" !== "") {`,
-            `        textFrame.texts[0].appliedFont = app.fonts.itemByName("${escapedFontName}");`,
-            '      }',
-            '',
-            `      if ("${textColor}" !== "") {`,
-            '      try {',
-            `        textFrame.texts[0].fillColor = app.colors.itemByName("${textColor}");`,
-            '      } catch (colorError) {',
-            '        // Use default color if specified color not found',
-            '      }',
-            '      }',
-            '',
-            `      if ("${alignment}" !== "") {`,
-            `        if ("${alignment}" === "CENTER") {`,
-            '          textFrame.texts[0].justification = Justification.CENTER_ALIGN;',
-            `        } else if ("${alignment}" === "RIGHT") {`,
-            '          textFrame.texts[0].justification = Justification.RIGHT_ALIGN;',
-            `        } else if ("${alignment}" === "JUSTIFY") {`,
-            '          textFrame.texts[0].justification = Justification.FULLY_JUSTIFIED;',
-            '        } else {',
-            '          textFrame.texts[0].justification = Justification.LEFT_ALIGN;',
-            '        }',
-            '      }',
-            '',
-            '      "Text frame updated successfully";',
-            '    }',
-            '  } catch (error) {',
-            '    "Error updating text frame: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+            if (${frameIndex} >= page.textFrames.length) {
+                return { success: false, error: 'Text frame index out of range' };
+            }
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Edit Text Frame");
+            const textFrame = page.textFrames.item(${frameIndex});
+
+            const newContent = ${JSON.stringify(content || '')};
+            if (newContent !== '') {
+                textFrame.contents = newContent;
+            }
+
+            const newFontSize = ${fontSize || 0};
+            if (newFontSize) {
+                try { textFrame.texts.item(0).pointSize = newFontSize; } catch(e) {}
+            }
+
+            const newFontName = ${JSON.stringify(fontName || '')};
+            if (newFontName !== '') {
+                try { textFrame.texts.item(0).appliedFont = app.fonts.itemByName(newFontName); } catch(e) {}
+            }
+
+            const newTextColor = ${JSON.stringify(textColor || '')};
+            if (newTextColor !== '') {
+                try { textFrame.texts.item(0).fillColor = doc.colors.itemByName(newTextColor); } catch(e) {}
+            }
+
+            const newAlignment = ${JSON.stringify(alignment || '')};
+            if (newAlignment !== '') {
+                const alignMap = { CENTER: 'centerAlign', RIGHT: 'rightAlign', JUSTIFY: 'fullyJustified', LEFT: 'leftAlign' };
+                const alignKey = alignMap[newAlignment] || 'leftAlign';
+                try { textFrame.texts.item(0).justification = alignKey; } catch(e) {}
+            }
+
+            return { success: true };
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse('Text frame updated successfully', "Edit Text Frame") :
+            formatErrorResponse(result?.error || 'Failed to edit text frame', "Edit Text Frame");
     }
 
     /**
@@ -210,46 +199,48 @@ export class TextHandlers {
         // Use session manager for positioning if coordinates not provided
         const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '  var table;',
-            '',
-            '  try {',
-            '    // Create text frame for table',
-            '    var textFrame = page.textFrames.add();',
-            `    textFrame.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];`,
-            '',
-            '    // Create table',
-            `    table = textFrame.insertionPoints[0].tables.add({bodyRowCount: ${rows}, bodyColumnCount: ${columns}});`,
-            '',
-            '    // Set header rows and columns',
-            `    table.headerRowCount = ${headerRows};`,
-            `    table.headerColumnCount = ${headerColumns};`,
-            '',
-            '    "Table created successfully";',
-            '  } catch (error) {',
-            '    "Error creating table: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
+            try {
+                const textFrame = page.textFrames.add();
+                textFrame.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];
 
-        // Store the created item info in session
-        sessionManager.setLastCreatedItem({
-            type: 'table',
-            rows: rows,
-            columns: columns,
-            position: positioning,
-            headerRows: headerRows,
-            headerColumns: headerColumns
-        });
+                const table = textFrame.insertionPoints.item(0).tables.add({
+                    bodyRowCount: ${rows},
+                    bodyColumnCount: ${columns}
+                });
 
-        return formatResponse(result, "Create Table");
+                table.headerRowCount = ${headerRows};
+                table.headerColumnCount = ${headerColumns};
+
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error creating table: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+
+        if (result?.success) {
+            // Store the created item info in session
+            sessionManager.setLastCreatedItem({
+                type: 'table',
+                rows: rows,
+                columns: columns,
+                position: positioning,
+                headerRows: headerRows,
+                headerColumns: headerColumns
+            });
+        }
+
+        return result?.success ?
+            formatResponse('Table created successfully', "Create Table") :
+            formatErrorResponse(result?.error || 'Failed to create table', "Create Table");
     }
 
     /**
@@ -264,66 +255,61 @@ export class TextHandlers {
         } = args;
 
         if (!data || !Array.isArray(data)) {
-            return formatResponse("Invalid data provided. Expected array of arrays.", "Populate Table");
+            return formatErrorResponse("Invalid data provided. Expected array of arrays.", "Populate Table");
         }
 
-        const escapedData = data.map(row =>
-            row.map(cell => escapeJsxString(cell.toString()))
-        );
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '',
-            '  try {',
-            '    // Find table in text frames',
-            '    var table = null;',
-            '    var tableCount = 0;',
-            '',
-            '    for (var i = 0; i < page.textFrames.length; i++) {',
-            '      var textFrame = page.textFrames[i];',
-            '      if (textFrame.tables.length > 0) {',
-            `        if (tableCount === ${tableIndex}) {`,
-            '          table = textFrame.tables[0];',
-            '          break;',
-            '        }',
-            '        tableCount++;',
-            '      }',
-            '    }',
-            '',
-            '    if (!table) {',
-            `      "Table index ${tableIndex} not found";`,
-            '    } else {',
-            '      // Populate table with data',
-            `      var data = ${JSON.stringify(escapedData)};`,
-            `      var startRow = ${startRow};`,
-            `      var startColumn = ${startColumn};`,
-            '',
-            '      for (var row = 0; row < data.length; row++) {',
-            '        for (var col = 0; col < data[row].length; col++) {',
-            '          var cellRow = startRow + row;',
-            '          var cellCol = startColumn + col;',
-            '',
-            '          if (cellRow < table.rows.length && cellCol < table.columns.length) {',
-            '            var cell = table.cells.item(cellRow, cellCol);',
-            '            cell.contents = data[row][col];',
-            '          }',
-            '        }',
-            '      }',
-            '',
-            '      "Table populated successfully";',
-            '    }',
-            '  } catch (error) {',
-            '    "Error populating table: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+            try {
+                let table = null;
+                let tableCount = 0;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Populate Table");
+                for (let i = 0; i < page.textFrames.length; i++) {
+                    const textFrame = page.textFrames.item(i);
+                    if (textFrame.tables.length > 0) {
+                        if (tableCount === ${tableIndex}) {
+                            table = textFrame.tables.item(0);
+                            break;
+                        }
+                        tableCount++;
+                    }
+                }
+
+                if (!table) {
+                    return { success: false, error: 'Table index ${tableIndex} not found' };
+                }
+
+                const cellData = ${JSON.stringify(data.map(row => row.map(cell => cell.toString())))};
+                const startRow = ${startRow};
+                const startColumn = ${startColumn};
+                let changed = 0;
+
+                for (let row = 0; row < cellData.length; row++) {
+                    for (let col = 0; col < cellData[row].length; col++) {
+                        const cellRow = startRow + row;
+                        const cellCol = startColumn + col;
+                        if (cellRow < table.rows.length && cellCol < table.columns.length) {
+                            table.cells.item(cellRow, cellCol).contents = cellData[row][col];
+                            changed++;
+                        }
+                    }
+                }
+
+                return { success: true, changed: changed };
+            } catch(e) {
+                return { success: false, error: 'Error populating table: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(`Table populated successfully (${result.changed} cells updated)`, "Populate Table") :
+            formatErrorResponse(result?.error || 'Failed to populate table', "Populate Table");
     }
 
     /**
@@ -337,41 +323,37 @@ export class TextHandlers {
             wholeWord = false
         } = args;
 
-        const escapedFindText = escapeJsxString(findText);
-        const escapedReplaceText = escapeJsxString(replaceText);
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var findGrepPreferences = app.findGrepPreferences;',
-            '  var changeGrepPreferences = app.changeGrepPreferences;',
-            '',
-            '  try {',
-            '    // Clear previous preferences',
-            '    findGrepPreferences.clear();',
-            '    changeGrepPreferences.clear();',
-            '',
-            '    // Set find preferences',
-            `    findGrepPreferences.findWhat = "${escapedFindText}";`,
-            `    findGrepPreferences.caseSensitive = ${caseSensitive};`,
-            `    findGrepPreferences.wholeWord = ${wholeWord};`,
-            '',
-            '    // Set change preferences',
-            `    changeGrepPreferences.changeTo = "${escapedReplaceText}";`,
-            '',
-            '    // Perform find and replace',
-            '    var foundItems = doc.changeGrep();',
-            '',
-            '    "Find and replace completed. Items changed: " + foundItems.length;',
-            '  } catch (error) {',
-            '    "Error during find and replace: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+            try {
+                app.findGrepPreferences = null;
+                app.changeGrepPreferences = null;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Find Replace Text");
+                app.findGrepPreferences.findWhat = ${JSON.stringify(findText)};
+                app.findGrepPreferences.caseSensitive = ${caseSensitive};
+                app.findGrepPreferences.wholeWord = ${wholeWord};
+
+                app.changeGrepPreferences.changeTo = ${JSON.stringify(replaceText)};
+
+                const changed = doc.changeGrep();
+                const count = changed ? changed.length : 0;
+
+                app.findGrepPreferences = null;
+                app.changeGrepPreferences = null;
+
+                return { success: true, count: count };
+            } catch(e) {
+                return { success: false, error: 'Error during find and replace: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(`Find and replace completed. Items changed: ${result.count}`, "Find Replace Text") :
+            formatErrorResponse(result?.error || 'Failed to find and replace', "Find Replace Text");
     }
 } 

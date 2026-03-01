@@ -2,7 +2,7 @@
  * PageItem management handlers
  */
 import { ScriptExecutor } from '../core/scriptExecutor.js';
-import { formatResponse, escapeJsxString } from '../utils/stringUtils.js';
+import { formatResponse, formatErrorResponse } from '../utils/stringUtils.js';
 
 export class PageItemHandlers {
     /**
@@ -11,37 +11,39 @@ export class PageItemHandlers {
     static async getPageItemInfo(args) {
         const { pageIndex, itemIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            '      var info = "=== PAGE ITEM INFO ===\\n";',
-            '      info += "Type: " + item.constructor.name + "\\n";',
-            '      info += "Name: " + (item.name || "Unnamed") + "\\n";',
-            '      info += "ID: " + item.id + "\\n";',
-            '      info += "Visible: " + item.visible + "\\n";',
-            '      info += "Locked: " + item.locked + "\\n";',
-            '      info += "Bounds: " + item.geometricBounds.join(", ") + "\\n";',
-            '      info += "Fill Color: " + (item.fillColor ? item.fillColor.name : "None") + "\\n";',
-            '      info += "Stroke Color: " + (item.strokeColor ? item.strokeColor.name : "None") + "\\n";',
-            '      info += "Stroke Weight: " + item.strokeWeight + "\\n";',
-            '      info;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const item = page.allPageItems[${itemIndex}];
+            let type = 'Unknown';
+            try { type = item.constructor?.name || 'Unknown'; } catch(e) {}
+            let fillColorName = 'None';
+            let strokeColorName = 'None';
+            try { fillColorName = item.fillColor ? item.fillColor.name : 'None'; } catch(e) {}
+            try { strokeColorName = item.strokeColor ? item.strokeColor.name : 'None'; } catch(e) {}
+            let strokeWeight = 0;
+            try { strokeWeight = item.strokeWeight; } catch(e) {}
+            return {
+                success: true,
+                type,
+                name: item.name || 'Unnamed',
+                id: item.id,
+                visible: item.visible,
+                locked: item.locked,
+                geometricBounds: item.geometricBounds,
+                fillColorName,
+                strokeColorName,
+                strokeWeight
+            };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Get Page Item Info");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Get Page Item Info")
+            : formatErrorResponse(result?.error || 'Failed to get page item info', "Get Page Item Info");
     }
 
     /**
@@ -50,28 +52,28 @@ export class PageItemHandlers {
     static async selectPageItem(args) {
         const { pageIndex, itemIndex, existingSelection = 'REPLACE_WITH' } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            `      item.select(SelectionOptions.${existingSelection});`,
-            '      "Page item selected successfully";',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const selectionMap = {
+            REPLACE_WITH: 'replaceWith',
+            ADD_TO: 'addTo'
+        };
+        const uxpSelection = selectionMap[existingSelection] || 'replaceWith';
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Select Page Item");
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const { SelectionOptions } = require('indesign');
+            const item = page.allPageItems[${itemIndex}];
+            item.select(SelectionOptions.${uxpSelection});
+            return { success: true, id: item.id };
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Select Page Item")
+            : formatErrorResponse(result?.error || 'Failed to select page item', "Select Page Item");
     }
 
     /**
@@ -80,28 +82,21 @@ export class PageItemHandlers {
     static async movePageItem(args) {
         const { pageIndex, itemIndex, x, y } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            `      item.move([${x}, ${y}]);`,
-            '      "Page item moved successfully";',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const item = page.allPageItems[${itemIndex}];
+            item.move([${x}, ${y}]);
+            return { success: true, id: item.id, geometricBounds: item.geometricBounds };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Move Page Item");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Move Page Item")
+            : formatErrorResponse(result?.error || 'Failed to move page item', "Move Page Item");
     }
 
     /**
@@ -110,28 +105,35 @@ export class PageItemHandlers {
     static async resizePageItem(args) {
         const { pageIndex, itemIndex, width, height, anchorPoint = 'CENTER_ANCHOR' } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            `      item.resize(ResizeMethods.REPLACING_CURRENT_DIMENSIONS_WITH, ResizeConstraints.UNCONSTRAINED, [${width}, ${height}], AnchorPoint.${anchorPoint});`,
-            '      "Page item resized successfully";',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const anchorMap = {
+            CENTER_ANCHOR: 'centerAnchor',
+            TOP_LEFT_ANCHOR: 'topLeftAnchor',
+            TOP_CENTER_ANCHOR: 'topCenterAnchor',
+            TOP_RIGHT_ANCHOR: 'topRightAnchor',
+            LEFT_CENTER_ANCHOR: 'leftCenterAnchor',
+            RIGHT_CENTER_ANCHOR: 'rightCenterAnchor',
+            BOTTOM_LEFT_ANCHOR: 'bottomLeftAnchor',
+            BOTTOM_CENTER_ANCHOR: 'bottomCenterAnchor',
+            BOTTOM_RIGHT_ANCHOR: 'bottomRightAnchor'
+        };
+        const uxpAnchor = anchorMap[anchorPoint] || 'centerAnchor';
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Resize Page Item");
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const { CoordinateSpaces, AnchorPoint, ResizeMethods } = require('indesign');
+            const item = page.allPageItems[${itemIndex}];
+            item.resize(CoordinateSpaces.pasteboardCoordinates, AnchorPoint.${uxpAnchor}, ResizeMethods.replacingCurrentDimensionsWith, [${width}, ${height}]);
+            return { success: true, id: item.id, geometricBounds: item.geometricBounds };
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Resize Page Item")
+            : formatErrorResponse(result?.error || 'Failed to resize page item', "Resize Page Item");
     }
 
     /**
@@ -140,48 +142,35 @@ export class PageItemHandlers {
     static async setPageItemProperties(args) {
         const { pageIndex, itemIndex, fillColor, strokeColor, strokeWeight, visible, locked } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            '',
-            `      if (${fillColor} !== undefined) {`,
-            `        item.fillColor = doc.colors.itemByName("${fillColor}");`,
-            '      }',
-            '',
-            `      if (${strokeColor} !== undefined) {`,
-            `        item.strokeColor = doc.colors.itemByName("${strokeColor}");`,
-            '      }',
-            '',
-            `      if (${strokeWeight} !== undefined) {`,
-            `        item.strokeWeight = ${strokeWeight};`,
-            '      }',
-            '',
-            `      if (${visible} !== undefined) {`,
-            `        item.visible = ${visible};`,
-            '      }',
-            '',
-            `      if (${locked} !== undefined) {`,
-            `        item.locked = ${locked};`,
-            '      }',
-            '',
-            '      "Page item properties updated successfully";',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const item = page.allPageItems[${itemIndex}];
+            if (${JSON.stringify(fillColor)} !== null && ${JSON.stringify(fillColor)} !== undefined) {
+                try { item.fillColor = doc.colors.itemByName(${JSON.stringify(fillColor)}); } catch(e) {}
+            }
+            if (${JSON.stringify(strokeColor)} !== null && ${JSON.stringify(strokeColor)} !== undefined) {
+                try { item.strokeColor = doc.colors.itemByName(${JSON.stringify(strokeColor)}); } catch(e) {}
+            }
+            if (${strokeWeight} !== null && ${strokeWeight} !== undefined) {
+                item.strokeWeight = ${strokeWeight};
+            }
+            if (${visible} !== null && ${visible} !== undefined) {
+                item.visible = ${visible};
+            }
+            if (${locked} !== null && ${locked} !== undefined) {
+                item.locked = ${locked};
+            }
+            return { success: true, id: item.id };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Set Page Item Properties");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Set Page Item Properties")
+            : formatErrorResponse(result?.error || 'Failed to set page item properties', "Set Page Item Properties");
     }
 
     /**
@@ -190,29 +179,22 @@ export class PageItemHandlers {
     static async duplicatePageItem(args) {
         const { pageIndex, itemIndex, x, y } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            `      var newItem = item.duplicate();`,
-            `      newItem.move([${x}, ${y}]);`,
-            '      "Page item duplicated successfully";',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const item = page.allPageItems[${itemIndex}];
+            const newItem = item.duplicate();
+            newItem.move([${x}, ${y}]);
+            return { success: true, id: newItem.id, geometricBounds: newItem.geometricBounds };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Duplicate Page Item");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Duplicate Page Item")
+            : formatErrorResponse(result?.error || 'Failed to duplicate page item', "Duplicate Page Item");
     }
 
     /**
@@ -221,28 +203,22 @@ export class PageItemHandlers {
     static async deletePageItem(args) {
         const { pageIndex, itemIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    if (${itemIndex} >= page.allPageItems.length) {`,
-            '      "Page item index out of range";',
-            '    } else {',
-            `      var item = page.allPageItems[${itemIndex}];`,
-            '      item.remove();',
-            '      "Page item deleted successfully";',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            const item = page.allPageItems[${itemIndex}];
+            const id = item.id;
+            item.remove();
+            return { success: true, deletedId: id };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Delete Page Item");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Delete Page Item")
+            : formatErrorResponse(result?.error || 'Failed to delete page item', "Delete Page Item");
     }
 
     /**
@@ -251,36 +227,32 @@ export class PageItemHandlers {
     static async listPageItems(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    var items = page.allPageItems;',
-            '    var result = "=== PAGE ITEMS ===\\n";',
-            '',
-            '    for (var i = 0; i < items.length; i++) {',
-            '      var item = items[i];',
-            '      result += "Index: " + i + "\\n";',
-            '      result += "Type: " + item.constructor.name + "\\n";',
-            '      result += "Name: " + (item.name || "Unnamed") + "\\n";',
-            '      result += "ID: " + item.id + "\\n";',
-            '      result += "Visible: " + item.visible + "\\n";',
-            '      result += "Locked: " + item.locked + "\\n";',
-            '      result += "Bounds: " + item.geometricBounds.join(", ") + "\\n";',
-            '      result += "---\\n";',
-            '    }',
-            '',
-            '    result;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            const items = [];
+            for (let i = 0; i < page.allPageItems.length; i++) {
+                const item = page.allPageItems[i];
+                let type = 'Unknown';
+                try { type = item.constructor?.name || 'Unknown'; } catch(e) {}
+                items.push({
+                    index: i,
+                    type,
+                    name: item.name || 'Unnamed',
+                    id: item.id,
+                    visible: item.visible,
+                    locked: item.locked,
+                    geometricBounds: item.geometricBounds
+                });
+            }
+            return { success: true, items, count: items.length, pageIndex: ${pageIndex} };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "List Page Items");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "List Page Items")
+            : formatErrorResponse(result?.error || 'Failed to list page items', "List Page Items");
     }
-} 
+}

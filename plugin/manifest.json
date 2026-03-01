@@ -17,7 +17,7 @@
   ],
   "requiredPermissions": {
     "network": {
-      "domains": ["ws://127.0.0.1:3001"]
+      "domains": "all"
     },
     "allowCodeGenerationFromStrings": true
   }

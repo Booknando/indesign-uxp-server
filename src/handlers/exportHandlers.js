@@ -46,66 +46,61 @@ export class ExportHandlers {
             pageRange = 'all'
         } = args;
 
-        const escapedFolderPath = escapeJsxString(folderPath);
+        const formatLower = format.toLowerCase();
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var folder = Folder("' + escapedFolderPath + '");',
-            '',
-            '  try {',
-            '    if (!folder.exists) {',
-            '      folder.create();',
-            '    }',
-            '',
-            '    var exportFormat;',
-            `    if ("${format}" === "JPEG") {`,
-            '      exportFormat = ExportFormat.JPEG;',
-            `    } else if ("${format}" === "PNG") {`,
-            '      exportFormat = ExportFormat.PNG;',
-            `    } else if ("${format}" === "TIFF") {`,
-            '      exportFormat = ExportFormat.TIFF;',
-            '    } else {',
-            '      exportFormat = ExportFormat.JPEG;',
-            '    }',
-            '',
-            '    var exportedCount = 0;',
-            '    var startPage = 0;',
-            '    var endPage = doc.pages.length - 1;',
-            '',
-            `    if ("${pageRange}" !== "all") {`,
-            '      // Parse page range (e.g., "1-3" or "1,3,5")',
-            '      var range = "' + pageRange + '".split(",");',
-            '      for (var i = 0; i < range.length; i++) {',
-            '        var pageNum = parseInt(range[i]) - 1;',
-            '        if (pageNum >= 0 && pageNum < doc.pages.length) {',
-            '          var fileName = folder.fsName + "/page_" + (pageNum + 1) + "." + "' + format.toLowerCase() + '";',
-            '          var imageFile = File(fileName);',
-            '          doc.pages[pageNum].exportFile(exportFormat, imageFile, false);',
-            '          exportedCount++;',
-            '        }',
-            '      }',
-            '    } else {',
-            '      // Export all pages',
-            '      for (var i = 0; i < doc.pages.length; i++) {',
-            '        var fileName = folder.fsName + "/page_" + (i + 1) + "." + "' + format.toLowerCase() + '";',
-            '        var imageFile = File(fileName);',
-            '        doc.pages[i].exportFile(exportFormat, imageFile, false);',
-            '        exportedCount++;',
-            '      }',
-            '    }',
-            '',
-            `    exportedCount + " pages exported as ${format} images to: ${escapedFolderPath}";`,
-            '  } catch (error) {',
-            '    "Error exporting images: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { ExportFormat } = require('indesign');
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const folder = ${JSON.stringify(folderPath)};
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Export Images");
+            try {
+                const formatStr = ${JSON.stringify(format)};
+                let exportFormat;
+                if (formatStr === 'JPEG') {
+                    exportFormat = ExportFormat.jpegType;
+                } else if (formatStr === 'PNG') {
+                    exportFormat = ExportFormat.pngType;
+                } else if (formatStr === 'TIFF') {
+                    exportFormat = ExportFormat.tiffType;
+                } else {
+                    exportFormat = ExportFormat.jpegType;
+                }
+
+                const ext = ${JSON.stringify(formatLower)};
+                const pageRangeStr = ${JSON.stringify(pageRange)};
+                let exportedCount = 0;
+
+                if (pageRangeStr !== 'all') {
+                    const pages = pageRangeStr.split(',');
+                    for (let i = 0; i < pages.length; i++) {
+                        const pageNum = parseInt(pages[i]) - 1;
+                        if (pageNum >= 0 && pageNum < doc.pages.length) {
+                            const fileName = folder + '/page_' + (pageNum + 1) + '.' + ext;
+                            doc.pages.item(pageNum).exportFile(exportFormat, fileName, false);
+                            exportedCount++;
+                        }
+                    }
+                } else {
+                    for (let i = 0; i < doc.pages.length; i++) {
+                        const fileName = folder + '/page_' + (i + 1) + '.' + ext;
+                        doc.pages.item(i).exportFile(exportFormat, fileName, false);
+                        exportedCount++;
+                    }
+                }
+
+                return { success: true, count: exportedCount };
+            } catch(e) {
+                return { success: false, error: 'Error exporting images: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(`${result.count} pages exported as ${format} images to: ${folderPath}`, "Export Images") :
+            formatErrorResponse(result?.error || 'Failed to export images', "Export Images");
     }
 
     /**
@@ -113,40 +108,32 @@ export class ExportHandlers {
      */
     static async packageDocument(args) {
         const { folderPath, includeFonts = true, includeLinks = true, includeProfiles = true } = args;
-        const escapedFolderPath = escapeJsxString(folderPath);
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var folder = Folder("' + escapedFolderPath + '");',
-            '',
-            '  try {',
-            '    if (!folder.exists) {',
-            '      folder.create();',
-            '    }',
-            '',
-            '    // Set package preferences',
-            '    var packagePrefs = doc.packagePreferences;',
-            `    packagePrefs.includeFonts = ${includeFonts};`,
-            `    packagePrefs.includeLinks = ${includeLinks};`,
-            `    packagePrefs.includeProfiles = ${includeProfiles};`,
-            '    packagePrefs.includeNonPrinting = false;',
-            '    packagePrefs.includeHiddenLayers = false;',
-            '    packagePrefs.includeEmptyPages = true;',
-            '',
-            '    // Package the document',
-            '    doc.packageForPrint(folder);',
-            '',
-            `    "Document packaged successfully to: ${escapedFolderPath}";`,
-            '  } catch (error) {',
-            '    "Error packaging document: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Package Document");
+            try {
+                doc.packageForPrint(
+                    ${JSON.stringify(folderPath)},
+                    ${includeFonts},
+                    ${includeLinks},
+                    ${includeProfiles},
+                    false,
+                    false,
+                    true
+                );
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error packaging document: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(`Document packaged successfully to: ${folderPath}`, "Package Document") :
+            formatErrorResponse(result?.error || 'Failed to package document', "Package Document");
     }
 } 

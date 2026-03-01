@@ -2,44 +2,35 @@
  * Page management handlers
  */
 import { ScriptExecutor } from '../core/scriptExecutor.js';
-import { formatResponse, escapeJsxString } from '../utils/stringUtils.js';
+import { formatResponse, formatErrorResponse } from '../utils/stringUtils.js';
 
 export class PageHandlers {
     /**
      * Add a new page to the document
      */
     static async addPage(args) {
-        const { position = 'AT_END', referencePage } = args;
+        const { position = 'AT_END', referencePage = 0 } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var newPage;',
-            '',
-            '  try {',
-            `    if ("${position}" === "AT_END") {`,
-            '      newPage = doc.pages.add();',
-            `    } else if ("${position}" === "AT_BEGINNING") {`,
-            '      newPage = doc.pages.add(LocationOptions.AT_BEGINNING);',
-            `    } else if ("${position}" === "BEFORE" && ${referencePage} !== undefined) {`,
-            `      newPage = doc.pages.add(LocationOptions.BEFORE, doc.pages[${referencePage}]);`,
-            `    } else if ("${position}" === "AFTER" && ${referencePage} !== undefined) {`,
-            `      newPage = doc.pages.add(LocationOptions.AFTER, doc.pages[${referencePage}]);`,
-            '    } else {',
-            '      newPage = doc.pages.add();',
-            '    }',
-            '',
-            '    "Page added successfully. Total pages: " + doc.pages.length;',
-            '  } catch (error) {',
-            '    "Error adding page: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { LocationOptions } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            const locMap = {
+                AT_END: LocationOptions.atEnd,
+                AT_BEGINNING: LocationOptions.atBeginning,
+                BEFORE: LocationOptions.before,
+                AFTER: LocationOptions.after
+            };
+            const loc = locMap[${JSON.stringify(position)}] || LocationOptions.atEnd;
+            const refPage = doc.pages.item(${referencePage});
+            const page = doc.pages.add(loc, refPage);
+            return { success: true, pageIndex: page.documentOffset, name: page.name, totalPages: doc.pages.length };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Add Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Add Page")
+            : formatErrorResponse(result?.error || 'Failed to add page', "Add Page");
     }
 
     /**
@@ -48,32 +39,29 @@ export class PageHandlers {
     static async getPageInfo(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    var info = "=== PAGE INFO ===\\n";',
-            '    info += "Index: " + page.documentOffset + "\\n";',
-            '    info += "Name: " + page.name + "\\n";',
-            '    info += "Label: " + page.label + "\\n";',
-            '    info += "Bounds: " + page.bounds + "\\n";',
-            '    info += "Side: " + page.side + "\\n";',
-            '    info += "Applied Master: " + (page.appliedMaster ? page.appliedMaster.name : "None") + "\\n";',
-            '    info += "Page Color: " + page.pageColor + "\\n";',
-            '    info += "Optional Page: " + page.optionalPage + "\\n";',
-            '    info += "Layout Rule: " + page.layoutRule + "\\n";',
-            '    info;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            return {
+                success: true,
+                index: page.documentOffset,
+                name: page.name,
+                label: page.label,
+                bounds: page.bounds,
+                side: String(page.side),
+                appliedMaster: page.appliedMaster ? page.appliedMaster.name : 'None',
+                pageColor: String(page.pageColor),
+                optionalPage: page.optionalPage,
+                layoutRule: String(page.layoutRule)
+            };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Get Page Info");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Get Page Info")
+            : formatErrorResponse(result?.error || 'Failed to get page info', "Get Page Info");
     }
 
     /**
@@ -82,22 +70,18 @@ export class PageHandlers {
     static async navigateToPage(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    doc.pages[${pageIndex}].select();`,
-            `    "Navigated to page ${pageIndex}";`,
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            doc.pages.item(${pageIndex}).select();
+            return { success: true, pageIndex: ${pageIndex} };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Navigate to Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Navigate to Page")
+            : formatErrorResponse(result?.error || 'Failed to navigate to page', "Navigate to Page");
     }
 
     /**
@@ -106,26 +90,18 @@ export class PageHandlers {
     static async deletePage(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            '    try {',
-            `      doc.pages[${pageIndex}].remove();`,
-            '      "Page deleted successfully. Total pages: " + doc.pages.length;',
-            '    } catch (error) {',
-            '      "Error deleting page: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            doc.pages.item(${pageIndex}).remove();
+            return { success: true, totalPages: doc.pages.length };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Delete Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Delete Page")
+            : formatErrorResponse(result?.error || 'Failed to delete page', "Delete Page");
     }
 
     /**
@@ -134,27 +110,19 @@ export class PageHandlers {
     static async duplicatePage(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            '    try {',
-            `      var originalPage = doc.pages[${pageIndex}];`,
-            '      var newPage = originalPage.duplicate();',
-            '      "Page duplicated successfully. Total pages: " + doc.pages.length;',
-            '    } catch (error) {',
-            '      "Error duplicating page: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const originalPage = doc.pages.item(${pageIndex});
+            const newPage = originalPage.duplicate();
+            return { success: true, newPageIndex: newPage.documentOffset, totalPages: doc.pages.length };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Duplicate Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Duplicate Page")
+            : formatErrorResponse(result?.error || 'Failed to duplicate page', "Duplicate Page");
     }
 
     /**
@@ -163,55 +131,53 @@ export class PageHandlers {
     static async movePage(args) {
         const { pageIndex, newPosition } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            '    try {',
-            `      var page = doc.pages[${pageIndex}];`,
-            `      page.move(LocationOptions.${newPosition});`,
-            '      "Page moved successfully";',
-            '    } catch (error) {',
-            '      "Error moving page: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { LocationOptions } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            const locMap = {
+                AT_END: LocationOptions.atEnd,
+                AT_BEGINNING: LocationOptions.atBeginning,
+                BEFORE: LocationOptions.before,
+                AFTER: LocationOptions.after
+            };
+            const loc = locMap[${JSON.stringify(newPosition)}] || LocationOptions.atEnd;
+            page.move(loc);
+            return { success: true, pageIndex: page.documentOffset };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Move Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Move Page")
+            : formatErrorResponse(result?.error || 'Failed to move page', "Move Page");
     }
 
     /**
      * Get all pages in the document
      */
     static async getAllPages(args) {
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var pages = doc.pages;',
-            '  var info = "=== ALL PAGES ===\\n";',
-            '  info += "Total pages: " + pages.length + "\\n\\n";',
-            '  for (var i = 0; i < pages.length; i++) {',
-            '    var page = pages[i];',
-            '    info += "Page " + i + ":\\n";',
-            '    info += "  Name: " + page.name + "\\n";',
-            '    info += "  Label: " + page.label + "\\n";',
-            '    info += "  Applied Master: " + (page.appliedMaster ? page.appliedMaster.name : "None") + "\\n";',
-            '    info += "\\n";',
-            '  }',
-            '  info;',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            const pages = [];
+            for (let i = 0; i < doc.pages.length; i++) {
+                const page = doc.pages.item(i);
+                pages.push({
+                    index: i,
+                    name: page.name,
+                    label: page.label,
+                    appliedMaster: page.appliedMaster ? page.appliedMaster.name : 'None'
+                });
+            }
+            return { success: true, totalPages: doc.pages.length, pages };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Get All Pages");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Get All Pages")
+            : formatErrorResponse(result?.error || 'Failed to get pages', "Get All Pages");
     }
 
     // =================== ADVANCED PAGE PROPERTIES ===================
@@ -222,98 +188,91 @@ export class PageHandlers {
     static async setPageProperties(args) {
         const { pageIndex, label, pageColor, optionalPage, layoutRule, snapshotBlendingMode, appliedTrapPreset } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            ...(label ? [`      page.label = "${escapeJsxString(label)}";`] : []),
-            ...(pageColor ? [`      page.pageColor = "${escapeJsxString(pageColor)}";`] : []),
-            ...(optionalPage !== undefined ? [`      page.optionalPage = ${optionalPage};`] : []),
-            ...(layoutRule ? [`      page.layoutRule = LayoutRule.${layoutRule};`] : []),
-            ...(snapshotBlendingMode ? [`      page.snapshotBlendingMode = SnapshotBlendingMode.${snapshotBlendingMode};`] : []),
-            ...(appliedTrapPreset ? [`      page.appliedTrapPreset = "${escapeJsxString(appliedTrapPreset)}";`] : []),
-            '      "Page properties updated successfully";',
-            '    } catch (error) {',
-            '      "Error updating page properties: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            ${label !== undefined ? `page.label = ${JSON.stringify(label)};` : ''}
+            ${pageColor !== undefined ? `page.pageColor = ${JSON.stringify(pageColor)};` : ''}
+            ${optionalPage !== undefined ? `page.optionalPage = ${optionalPage};` : ''}
+            ${layoutRule !== undefined ? `page.layoutRule = ${JSON.stringify(layoutRule)};` : ''}
+            ${snapshotBlendingMode !== undefined ? `page.snapshotBlendingMode = ${JSON.stringify(snapshotBlendingMode)};` : ''}
+            ${appliedTrapPreset !== undefined ? `page.appliedTrapPreset = ${JSON.stringify(appliedTrapPreset)};` : ''}
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Set Page Properties");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Set Page Properties")
+            : formatErrorResponse(result?.error || 'Failed to set page properties', "Set Page Properties");
     }
 
     /**
      * Adjust page layout with new dimensions and margins
      */
     static async adjustPageLayout(args) {
-        const { pageIndex, width, height, bleedInside, bleedTop, bleedOutside, bleedBottom, leftMargin, topMargin, rightMargin, bottomMargin } = args;
+        const {
+            pageIndex, width, height,
+            bleedInside, bleedTop, bleedOutside, bleedBottom,
+            leftMargin, topMargin, rightMargin, bottomMargin
+        } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            ...(width ? [`      page.resize(CoordinateSpaces.PAGE_COORDINATES, AnchorPoint.CENTER_ANCHOR, ResizeMethods.REPLACING_CURRENT_DIMENSIONS_WITH, UnitValue("${escapeJsxString(width)}"), UnitValue("${escapeJsxString(height || width)}"));`] : []),
-            ...(leftMargin ? [`      page.marginPreferences.left = UnitValue("${escapeJsxString(leftMargin)}");`] : []),
-            ...(topMargin ? [`      page.marginPreferences.top = UnitValue("${escapeJsxString(topMargin)}");`] : []),
-            ...(rightMargin ? [`      page.marginPreferences.right = UnitValue("${escapeJsxString(rightMargin)}");`] : []),
-            ...(bottomMargin ? [`      page.marginPreferences.bottom = UnitValue("${escapeJsxString(bottomMargin)}");`] : []),
-            ...(bleedInside ? [`      page.bleedBoxPreferences.inside = UnitValue("${escapeJsxString(bleedInside)}");`] : []),
-            ...(bleedTop ? [`      page.bleedBoxPreferences.top = UnitValue("${escapeJsxString(bleedTop)}");`] : []),
-            ...(bleedOutside ? [`      page.bleedBoxPreferences.outside = UnitValue("${escapeJsxString(bleedOutside)}");`] : []),
-            ...(bleedBottom ? [`      page.bleedBoxPreferences.bottom = UnitValue("${escapeJsxString(bleedBottom)}");`] : []),
-            '      "Page layout adjusted successfully";',
-            '    } catch (error) {',
-            '      "Error adjusting page layout: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { CoordinateSpaces, AnchorPoint, ResizeMethods } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            ${width !== undefined ? `page.resize(CoordinateSpaces.pasteboardCoordinates, AnchorPoint.centerAnchor, ResizeMethods.replacingCurrentDimensionsWith, ${width}, ${height !== undefined ? height : width});` : ''}
+            ${leftMargin !== undefined ? `page.marginPreferences.left = ${leftMargin};` : ''}
+            ${topMargin !== undefined ? `page.marginPreferences.top = ${topMargin};` : ''}
+            ${rightMargin !== undefined ? `page.marginPreferences.right = ${rightMargin};` : ''}
+            ${bottomMargin !== undefined ? `page.marginPreferences.bottom = ${bottomMargin};` : ''}
+            ${bleedInside !== undefined ? `page.bleedBoxPreferences.inside = ${bleedInside};` : ''}
+            ${bleedTop !== undefined ? `page.bleedBoxPreferences.top = ${bleedTop};` : ''}
+            ${bleedOutside !== undefined ? `page.bleedBoxPreferences.outside = ${bleedOutside};` : ''}
+            ${bleedBottom !== undefined ? `page.bleedBoxPreferences.bottom = ${bleedBottom};` : ''}
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Adjust Page Layout");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Adjust Page Layout")
+            : formatErrorResponse(result?.error || 'Failed to adjust page layout', "Adjust Page Layout");
     }
 
     /**
      * Resize a page
      */
     static async resizePage(args) {
-        const { pageIndex, width, height, resizeMethod = 'REPLACING_CURRENT_DIMENSIONS_WITH', anchorPoint = 'CENTER_ANCHOR', coordinateSpace = 'PAGE_COORDINATES' } = args;
+        const {
+            pageIndex, width, height,
+            resizeMethod = 'replacingCurrentDimensionsWith',
+            anchorPoint = 'centerAnchor',
+            coordinateSpace = 'pasteboardCoordinates'
+        } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            `      page.resize(CoordinateSpaces.${coordinateSpace}, AnchorPoint.${anchorPoint}, ResizeMethods.${resizeMethod}, UnitValue("${width}mm"), UnitValue("${height}mm"));`,
-            '      "Page resized successfully";',
-            '    } catch (error) {',
-            '      "Error resizing page: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { CoordinateSpaces, AnchorPoint, ResizeMethods } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            page.resize(
+                CoordinateSpaces[${JSON.stringify(coordinateSpace)}],
+                AnchorPoint[${JSON.stringify(anchorPoint)}],
+                ResizeMethods[${JSON.stringify(resizeMethod)}],
+                ${width},
+                ${height}
+            );
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Resize Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Resize Page")
+            : formatErrorResponse(result?.error || 'Failed to resize page', "Resize Page");
     }
 
     /**
@@ -322,32 +281,20 @@ export class PageHandlers {
     static async placeFileOnPage(args) {
         const { pageIndex, filePath, x = 10, y = 10, layerName, showingOptions = false, autoflowing = false } = args;
 
-        const escapedFilePath = escapeJsxString(filePath);
-        const escapedLayerName = layerName ? escapeJsxString(layerName) : '';
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            ${layerName !== undefined ? `const layer = doc.layers.itemByName(${JSON.stringify(layerName)});` : ''}
+            const placedItems = page.place(${JSON.stringify(filePath)}, [${x}, ${y}], ${showingOptions}, ${autoflowing}${layerName !== undefined ? ', layer' : ''});
+            return { success: true, itemCount: placedItems ? placedItems.length : 1 };
+        `;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            `    var file = File("${escapedFilePath}");`,
-            '    try {',
-            ...(escapedLayerName ? [`      var layer = doc.layers.itemByName("${escapedLayerName}");`] : []),
-            `      var placedItem = page.place(file, [${x}, ${y}], ${showingOptions}, ${autoflowing}${escapedLayerName ? ', layer' : ''});`,
-            '      "File placed successfully on page";',
-            '    } catch (error) {',
-            '      "Error placing file: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Place File on Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Place File on Page")
+            : formatErrorResponse(result?.error || 'Failed to place file on page', "Place File on Page");
     }
 
     /**
@@ -356,30 +303,20 @@ export class PageHandlers {
     static async placeXmlOnPage(args) {
         const { pageIndex, xmlElementName, x = 10, y = 10, autoflowing = false } = args;
 
-        const escapedXmlElementName = escapeJsxString(xmlElementName);
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            const xmlElement = doc.xmlElements.itemByName(${JSON.stringify(xmlElementName)});
+            const placedItem = page.place(xmlElement, [${x}, ${y}], false, ${autoflowing});
+            return { success: true };
+        `;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            `      var xmlElement = doc.xmlElements.itemByName("${escapedXmlElementName}");`,
-            `      var placedItem = page.place(xmlElement, [${x}, ${y}], false, ${autoflowing});`,
-            '      "XML content placed successfully on page";',
-            '    } catch (error) {',
-            '      "Error placing XML content: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Place XML on Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Place XML on Page")
+            : formatErrorResponse(result?.error || 'Failed to place XML on page', "Place XML on Page");
     }
 
     /**
@@ -388,27 +325,19 @@ export class PageHandlers {
     static async snapshotPageLayout(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            '      page.createLayoutSnapshot();',
-            '      "Page layout snapshot created successfully";',
-            '    } catch (error) {',
-            '      "Error creating page layout snapshot: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            page.createLayoutSnapshot();
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Snapshot Page Layout");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Snapshot Page Layout")
+            : formatErrorResponse(result?.error || 'Failed to create snapshot', "Snapshot Page Layout");
     }
 
     /**
@@ -417,27 +346,19 @@ export class PageHandlers {
     static async deletePageLayoutSnapshot(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            '      page.deleteLayoutSnapshot();',
-            '      "Page layout snapshot deleted successfully";',
-            '    } catch (error) {',
-            '      "Error deleting page layout snapshot: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            page.deleteLayoutSnapshot();
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Delete Page Layout Snapshot");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Delete Page Layout Snapshot")
+            : formatErrorResponse(result?.error || 'Failed to delete snapshot', "Delete Page Layout Snapshot");
     }
 
     /**
@@ -446,119 +367,98 @@ export class PageHandlers {
     static async deleteAllPageLayoutSnapshots(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            '      page.deleteAllLayoutSnapshots();',
-            '      "All page layout snapshots deleted successfully";',
-            '    } catch (error) {',
-            '      "Error deleting all page layout snapshots: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            page.deleteAllLayoutSnapshots();
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Delete All Page Layout Snapshots");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Delete All Page Layout Snapshots")
+            : formatErrorResponse(result?.error || 'Failed to delete all snapshots', "Delete All Page Layout Snapshots");
     }
 
     /**
      * Reframe (resize) a page
      */
     static async reframePage(args) {
-        const { pageIndex, x1, y1, x2, y2, coordinateSpace = 'PAGE_COORDINATES' } = args;
+        const { pageIndex, x1, y1, x2, y2, coordinateSpace = 'pasteboardCoordinates' } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            `      page.reframe(CoordinateSpaces.${coordinateSpace}, [${x1}, ${y1}, ${x2}, ${y2}]);`,
-            '      "Page reframed successfully";',
-            '    } catch (error) {',
-            '      "Error reframing page: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { CoordinateSpaces } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            page.reframe(CoordinateSpaces[${JSON.stringify(coordinateSpace)}], [${x1}, ${y1}, ${x2}, ${y2}]);
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Reframe Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Reframe Page")
+            : formatErrorResponse(result?.error || 'Failed to reframe page', "Reframe Page");
     }
 
     /**
      * Create guides on a page
      */
     static async createPageGuides(args) {
-        const { pageIndex, numberOfRows = 0, numberOfColumns = 0, rowGutter = 5, columnGutter = 5, guideColor = 'BLUE', fitMargins = true, removeExisting = false, layerName } = args;
+        const {
+            pageIndex,
+            numberOfRows = 0,
+            numberOfColumns = 0,
+            rowGutter = 5,
+            columnGutter = 5,
+            guideColor = 'blue',
+            fitMargins = true,
+            removeExisting = false,
+            layerName
+        } = args;
 
-        const escapedLayerName = layerName ? escapeJsxString(layerName) : '';
-        const escapedGuideColor = escapeJsxString(guideColor);
+        const code = `
+            const { GuideColor } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            ${removeExisting ? 'page.guides.everyItem().remove();' : ''}
+            ${layerName !== undefined ? `const layer = doc.layers.itemByName(${JSON.stringify(layerName)});` : ''}
+            const color = GuideColor[${JSON.stringify(guideColor.toLowerCase())}] || GuideColor.blue;
+            page.createGuides(${numberOfRows}, ${numberOfColumns}, ${rowGutter}, ${columnGutter}, color, ${fitMargins}${layerName !== undefined ? ', layer' : ''});
+            return { success: true };
+        `;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            ...(escapedLayerName ? [`      var layer = doc.layers.itemByName("${escapedLayerName}");`] : []),
-            ...(removeExisting ? ['      page.guides.everyItem().remove();'] : []),
-            `      page.createGuides(${numberOfRows}, ${numberOfColumns}, UnitValue("${rowGutter}mm"), UnitValue("${columnGutter}mm"), "${escapedGuideColor}", ${fitMargins}${escapedLayerName ? ', layer' : ''});`,
-            '      "Page guides created successfully";',
-            '    } catch (error) {',
-            '      "Error creating page guides: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Create Page Guides");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Create Page Guides")
+            : formatErrorResponse(result?.error || 'Failed to create page guides', "Create Page Guides");
     }
 
     /**
      * Select a page
      */
     static async selectPage(args) {
-        const { pageIndex, selectionMode = 'REPLACE_WITH' } = args;
+        const { pageIndex, selectionMode = 'replaceWith' } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            `      page.select(SelectionOptions.${selectionMode});`,
-            '      "Page selected successfully";',
-            '    } catch (error) {',
-            '      "Error selecting page: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            const { SelectionOptions } = require('indesign');
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            page.select(SelectionOptions[${JSON.stringify(selectionMode)}] || SelectionOptions.replaceWith);
+            return { success: true };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Select Page");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Select Page")
+            : formatErrorResponse(result?.error || 'Failed to select page', "Select Page");
     }
 
     /**
@@ -567,30 +467,27 @@ export class PageHandlers {
     static async getPageContentSummary(args) {
         const { pageIndex } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    var summary = "=== PAGE CONTENT SUMMARY ===\\n";',
-            '    summary += "Page: " + page.name + "\\n";',
-            '    summary += "Text Frames: " + page.textFrames.length + "\\n";',
-            '    summary += "Rectangles: " + page.rectangles.length + "\\n";',
-            '    summary += "Ellipses: " + page.ovals.length + "\\n";',
-            '    summary += "Graphics: " + page.graphics.length + "\\n";',
-            '    summary += "Groups: " + page.groups.length + "\\n";',
-            '    summary += "Total Items: " + page.allPageItems.length + "\\n";',
-            '    summary;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            return {
+                success: true,
+                pageName: page.name,
+                textFrames: page.textFrames.length,
+                rectangles: page.rectangles.length,
+                ellipses: page.ovals.length,
+                graphics: page.graphics.length,
+                groups: page.groups.length,
+                totalItems: page.allPageItems.length
+            };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Get Page Content Summary");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Get Page Content Summary")
+            : formatErrorResponse(result?.error || 'Failed to get page content summary', "Get Page Content Summary");
     }
 
     /**
@@ -599,56 +496,35 @@ export class PageHandlers {
     static async setPageBackground(args) {
         const { pageIndex = 0, backgroundColor = 'White', opacity = 100 } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            `  if (${pageIndex} >= doc.pages.length) {`,
-            '    "Page index out of range";',
-            '  } else {',
-            `    var page = doc.pages[${pageIndex}];`,
-            '    try {',
-            '      // Get page bounds',
-            '      var pageBounds = page.bounds;',
-            '      var pageWidth = pageBounds[3] - pageBounds[1];',
-            '      var pageHeight = pageBounds[2] - pageBounds[0];',
-            '',
-            '      // Create background rectangle',
-            '      var backgroundRect = page.rectangles.add();',
-            '      backgroundRect.geometricBounds = [0, 0, pageHeight, pageWidth];',
-            '',
-            '      // Set background color',
-            `      if ("${backgroundColor}" !== "White") {`,
-            '        try {',
-            `          var bgColor = doc.colors.itemByName("${escapeJsxString(backgroundColor)}");`,
-            '          if (bgColor.isValid) {',
-            '            backgroundRect.fillColor = bgColor;',
-            '          } else {',
-            '            backgroundRect.fillColor = doc.colors.itemByName("White");',
-            '          }',
-            '        } catch (colorError) {',
-            '          backgroundRect.fillColor = doc.colors.itemByName("White");',
-            '        }',
-            '      } else {',
-            '        backgroundRect.fillColor = doc.colors.itemByName("White");',
-            '      }',
-            '',
-            '      // Set opacity',
-            `      backgroundRect.transparencySettings.blendingSettings.opacity = ${opacity};`,
-            '',
-            '      // Send to back to ensure it\'s behind all content',
-            '      backgroundRect.sendToBack();',
-            '',
-            `      "Page background set successfully with color: ${backgroundColor} and opacity: ${opacity}%";`,
-            '    } catch (error) {',
-            '      "Error setting page background: " + error.message;',
-            '    }',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            const page = doc.pages.item(${pageIndex});
+            const pageBounds = page.bounds;
+            const pageWidth = pageBounds[3] - pageBounds[1];
+            const pageHeight = pageBounds[2] - pageBounds[0];
+            const backgroundRect = page.rectangles.add();
+            backgroundRect.geometricBounds = [0, 0, pageHeight, pageWidth];
+            const colorName = ${JSON.stringify(backgroundColor)};
+            if (colorName !== 'White') {
+                try {
+                    const bgColor = doc.colors.itemByName(colorName);
+                    backgroundRect.fillColor = bgColor.isValid ? bgColor : doc.colors.itemByName('White');
+                } catch (e) {
+                    backgroundRect.fillColor = doc.colors.itemByName('White');
+                }
+            } else {
+                backgroundRect.fillColor = doc.colors.itemByName('White');
+            }
+            backgroundRect.transparencySettings.blendingSettings.opacity = ${opacity};
+            backgroundRect.sendToBack();
+            return { success: true, backgroundColor: colorName, opacity: ${opacity} };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Set Page Background");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "Set Page Background")
+            : formatErrorResponse(result?.error || 'Failed to set page background', "Set Page Background");
     }
-} 
+}

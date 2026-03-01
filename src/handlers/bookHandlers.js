@@ -2,7 +2,7 @@
  * Book management handlers
  */
 import { ScriptExecutor } from '../core/scriptExecutor.js';
-import { formatResponse, escapeJsxString } from '../utils/stringUtils.js';
+import { formatResponse, formatErrorResponse } from '../utils/stringUtils.js';
 
 export class BookHandlers {
     /**
@@ -11,23 +11,20 @@ export class BookHandlers {
     static async createBook(args) {
         const { filePath } = args;
 
-        const escapedFilePath = escapeJsxString(filePath);
+        const code = `
+            try {
+                const book = app.books.add(${JSON.stringify(filePath)});
+                book.save();
+                return { success: true, message: 'Book created: ' + ${JSON.stringify(filePath)} };
+            } catch(e) {
+                return { success: false, error: 'Error creating book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedFilePath}");`,
-            'var bookFolder = bookFile.parent;',
-            'if (!bookFolder.exists) {',
-            '  bookFolder.create();',
-            '}',
-            '// Create the book without parameters',
-            'var book = app.books.add();',
-            'book.save(bookFile);',
-            'book.close();',
-            `"Book created successfully: ${escapedFilePath}";`
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Create Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Create Book") :
+            formatErrorResponse(result?.error || 'Failed to create book', "Create Book");
     }
 
     /**
@@ -36,20 +33,19 @@ export class BookHandlers {
     static async openBook(args) {
         const { filePath } = args;
 
-        const escapedFilePath = escapeJsxString(filePath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(filePath)});
+                return { success: true, message: 'Book opened: ' + book.name, name: book.name };
+            } catch(e) {
+                return { success: false, error: 'Error opening book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedFilePath}");`,
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedFilePath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  "Book opened successfully: " + book.name;',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Open Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Open Book") :
+            formatErrorResponse(result?.error || 'Failed to open book', "Open Book");
     }
 
     /**
@@ -58,28 +54,22 @@ export class BookHandlers {
     static async addDocumentToBook(args) {
         const { bookPath, documentPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
-        const escapedDocumentPath = escapeJsxString(documentPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.bookContents.add(${JSON.stringify(documentPath)});
+                book.save();
+                book.close();
+                return { success: true, message: 'Document added to book successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error adding document to book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            `var docFile = File("${escapedDocumentPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else if (!docFile.exists) {',
-            `  "Document file not found: ${escapedDocumentPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  var bookContent = book.bookContents.add(docFile);',
-            '  book.save();',
-            '  book.close();',
-            '  "Document added to book successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Add Document to Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Add Document to Book") :
+            formatErrorResponse(result?.error || 'Failed to add document to book', "Add Document to Book");
     }
 
     /**
@@ -88,24 +78,22 @@ export class BookHandlers {
     static async synchronizeBook(args) {
         const { bookPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.synchronize();
+                book.save();
+                book.close();
+                return { success: true, message: 'Book synchronized successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error synchronizing book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  book.synchronize();',
-            '  book.save();',
-            '  book.close();',
-            '  "Book synchronized successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Synchronize Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Synchronize Book") :
+            formatErrorResponse(result?.error || 'Failed to synchronize book', "Synchronize Book");
     }
 
     /**
@@ -114,35 +102,34 @@ export class BookHandlers {
     static async exportBook(args) {
         const { bookPath, format = 'PDF', outputPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
-        const escapedOutputPath = escapeJsxString(outputPath);
+        const code = `
+            const { ExportFormat } = require('indesign');
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                const fmt = ${JSON.stringify(format)};
+                let exportFormat;
+                if (fmt === 'PDF') {
+                    exportFormat = ExportFormat.pdfType;
+                } else if (fmt === 'EPUB') {
+                    exportFormat = ExportFormat.epub;
+                } else if (fmt === 'HTML') {
+                    exportFormat = ExportFormat.html;
+                } else {
+                    book.close();
+                    return { success: false, error: 'Unsupported format: ' + fmt };
+                }
+                book.exportFile(exportFormat, ${JSON.stringify(outputPath)});
+                book.close();
+                return { success: true, message: 'Book exported successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error exporting book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            `var outputFile = File("${escapedOutputPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '',
-            `  if ("${format}" === "PDF") {`,
-            '    book.exportFile(ExportFormat.PDF_TYPE, outputFile);',
-            `  } else if ("${format}" === "EPUB") {`,
-            '    book.exportFile(ExportFormat.EPUB, outputFile);',
-            `  } else if ("${format}" === "HTML") {`,
-            '    book.exportFile(ExportFormat.HTML, outputFile);',
-            '  } else {',
-            `    "Unsupported format: ${format}";`,
-            '  }',
-            '',
-            '  book.close();',
-            '  "Book exported successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Export Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Export Book") :
+            formatErrorResponse(result?.error || 'Failed to export book', "Export Book");
     }
 
     /**
@@ -163,27 +150,32 @@ export class BookHandlers {
             includePdf = false
         } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
-        const escapedOutputPath = escapeJsxString(outputPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.packageForPrint(
+                    ${JSON.stringify(outputPath)},
+                    ${copyingFonts},
+                    ${copyingLinkedGraphics},
+                    ${copyingProfiles},
+                    ${updatingGraphics},
+                    ${includingHiddenLayers},
+                    ${ignorePreflightErrors},
+                    ${creatingReport},
+                    ${includeIdml},
+                    ${includePdf}
+                );
+                book.close();
+                return { success: true, message: 'Book packaged successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error packaging book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            `var outputFolder = Folder("${escapedOutputPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '',
-            `  book.packageForPrint(outputFolder, ${copyingFonts}, ${copyingLinkedGraphics}, ${copyingProfiles}, ${updatingGraphics}, ${includingHiddenLayers}, ${ignorePreflightErrors}, ${creatingReport}, ${includeIdml}, ${includePdf});`,
-            '',
-            '  book.close();',
-            '  "Book packaged successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Package Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Package Book") :
+            formatErrorResponse(result?.error || 'Failed to package book', "Package Book");
     }
 
     /**
@@ -192,68 +184,84 @@ export class BookHandlers {
     static async getBookInfo(args) {
         const { bookPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                const contents = [];
+                for (let i = 0; i < book.bookContents.length; i++) {
+                    const item = book.bookContents.item(i);
+                    contents.push({
+                        name: item.name,
+                        status: String(item.status),
+                        pageCount: item.pageCount
+                    });
+                }
+                const info = {
+                    name: book.name,
+                    modified: book.modified,
+                    saved: book.saved,
+                    automaticPagination: book.automaticPagination,
+                    documentCount: book.bookContents.length,
+                    contents: contents
+                };
+                book.close();
+                return { success: true, info: info };
+            } catch(e) {
+                return { success: false, error: 'Error getting book info: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  var info = "=== BOOK INFORMATION ===\\n";',
-            '',
-            '  info += "Name: " + book.name + "\\n";',
-            '  info += "File Path: " + book.filePath + "\\n";',
-            '  info += "Modified: " + book.modified + "\\n";',
-            '  info += "Saved: " + book.saved + "\\n";',
-            '  info += "Automatic Pagination: " + book.automaticPagination + "\\n";',
-            '  info += "Automatic Document Conversion: " + book.automaticDocumentConversion + "\\n";',
-            '',
-            '  // Book contents',
-            '  info += "\\n=== BOOK CONTENTS ===\\n";',
-            '  info += "Number of Documents: " + book.bookContents.length + "\\n";',
-            '',
-            '  for (var i = 0; i < book.bookContents.length; i++) {',
-            '    var content = book.bookContents[i];',
-            '    info += "Document " + (i + 1) + ": " + content.name + "\\n";',
-            '    info += "  Status: " + content.status + "\\n";',
-            '    info += "  Page Count: " + content.pageCount + "\\n";',
-            '  }',
-            '',
-            '  book.close();',
-            '  info;',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Get Book Info");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        if (result?.success) {
+            const info = result.info;
+            let text = `=== BOOK INFORMATION ===\n`;
+            text += `Name: ${info.name}\n`;
+            text += `Modified: ${info.modified}\n`;
+            text += `Saved: ${info.saved}\n`;
+            text += `Automatic Pagination: ${info.automaticPagination}\n`;
+            text += `\n=== BOOK CONTENTS ===\n`;
+            text += `Number of Documents: ${info.documentCount}\n`;
+            for (let i = 0; i < info.contents.length; i++) {
+                const c = info.contents[i];
+                text += `Document ${i + 1}: ${c.name}\n  Status: ${c.status}\n  Page Count: ${c.pageCount}\n`;
+            }
+            return formatResponse(text, "Get Book Info");
+        }
+        return formatErrorResponse(result?.error || 'Failed to get book info', "Get Book Info");
     }
 
     /**
      * List all books
      */
     static async listBooks(args) {
-        const script = [
-            'var books = app.books;',
-            'var info = "=== ALL BOOKS ===\\n";',
-            'info += "Total books: " + books.length + "\\n\\n";',
-            '',
-            'for (var i = 0; i < books.length; i++) {',
-            '  var book = books[i];',
-            '  info += "Book " + i + ":\\n";',
-            '  info += "  Name: " + book.name + "\\n";',
-            '  info += "  File Path: " + book.filePath + "\\n";',
-            '  info += "  Modified: " + book.modified + "\\n";',
-            '  info += "  Saved: " + book.saved + "\\n";',
-            '  info += "  Document Count: " + book.bookContents.length + "\\n";',
-            '  info += "\\n";',
-            '}',
-            'info;'
-        ].join('\n');
+        const code = `
+            try {
+                const books = [];
+                for (let i = 0; i < app.books.length; i++) {
+                    const book = app.books.item(i);
+                    books.push({
+                        name: book.name,
+                        modified: book.modified,
+                        saved: book.saved,
+                        documentCount: book.bookContents.length
+                    });
+                }
+                return { success: true, books: books };
+            } catch(e) {
+                return { success: false, error: 'Error listing books: ' + e.message };
+            }
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "List Books");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        if (result?.success) {
+            let text = `=== ALL BOOKS ===\nTotal books: ${result.books.length}\n\n`;
+            for (let i = 0; i < result.books.length; i++) {
+                const b = result.books[i];
+                text += `Book ${i}:\n  Name: ${b.name}\n  Modified: ${b.modified}\n  Saved: ${b.saved}\n  Document Count: ${b.documentCount}\n\n`;
+            }
+            return formatResponse(text, "List Books");
+        }
+        return formatErrorResponse(result?.error || 'Failed to list books', "List Books");
     }
 
     /**
@@ -262,24 +270,22 @@ export class BookHandlers {
     static async repaginateBook(args) {
         const { bookPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.repaginate();
+                book.save();
+                book.close();
+                return { success: true, message: 'Book repaginated successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error repaginating book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  book.repaginate();',
-            '  book.save();',
-            '  book.close();',
-            '  "Book repaginated successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Repaginate Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Repaginate Book") :
+            formatErrorResponse(result?.error || 'Failed to repaginate book', "Repaginate Book");
     }
 
     /**
@@ -288,24 +294,22 @@ export class BookHandlers {
     static async updateAllCrossReferences(args) {
         const { bookPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.updateAllCrossReferences();
+                book.save();
+                book.close();
+                return { success: true, message: 'All cross references updated successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error updating cross references: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  book.updateAllCrossReferences();',
-            '  book.save();',
-            '  book.close();',
-            '  "All cross references updated successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Update All Cross References");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Update All Cross References") :
+            formatErrorResponse(result?.error || 'Failed to update cross references', "Update All Cross References");
     }
 
     /**
@@ -314,24 +318,22 @@ export class BookHandlers {
     static async updateAllNumbers(args) {
         const { bookPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.updateAllNumbers();
+                book.save();
+                book.close();
+                return { success: true, message: 'All numbers updated successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error updating numbers: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  book.updateAllNumbers();',
-            '  book.save();',
-            '  book.close();',
-            '  "All numbers updated successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Update All Numbers");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Update All Numbers") :
+            formatErrorResponse(result?.error || 'Failed to update numbers', "Update All Numbers");
     }
 
     /**
@@ -340,24 +342,22 @@ export class BookHandlers {
     static async updateChapterAndParagraphNumbers(args) {
         const { bookPath } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.updateChapterAndParagraphNumbers();
+                book.save();
+                book.close();
+                return { success: true, message: 'Chapter and paragraph numbers updated successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error updating chapter/paragraph numbers: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  book.updateChapterAndParagraphNumbers();',
-            '  book.save();',
-            '  book.close();',
-            '  "Chapter and paragraph numbers updated successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Update Chapter and Paragraph Numbers");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Update Chapter and Paragraph Numbers") :
+            formatErrorResponse(result?.error || 'Failed to update chapter/paragraph numbers', "Update Chapter and Paragraph Numbers");
     }
 
     /**
@@ -366,29 +366,24 @@ export class BookHandlers {
     static async preflightBook(args) {
         const { bookPath, outputPath, autoOpen = false } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
-        const escapedOutputPath = outputPath ? escapeJsxString(outputPath) : '';
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                ${outputPath
+                    ? `book.preflight(${JSON.stringify(outputPath)}, ${autoOpen});`
+                    : `book.preflight();`
+                }
+                book.close();
+                return { success: true, message: 'Book preflighted successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error preflighting book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            ...(escapedOutputPath ? [`var outputFile = File("${escapedOutputPath}");`] : []),
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            ...(escapedOutputPath ? [
-                '  book.preflight(outputFile, ' + autoOpen + ');'
-            ] : [
-                '  book.preflight();'
-            ]),
-            '  book.close();',
-            '  "Book preflighted successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Preflight Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Preflight Book") :
+            formatErrorResponse(result?.error || 'Failed to preflight book', "Preflight Book");
     }
 
     /**
@@ -397,23 +392,22 @@ export class BookHandlers {
     static async printBook(args) {
         const { bookPath, printDialog = true, printerPreset = 'DEFAULT_VALUE' } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const code = `
+            const { PrinterPresetTypes } = require('indesign');
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                book.print(${printDialog}, PrinterPresetTypes.${printerPreset});
+                book.close();
+                return { success: true, message: 'Book print job sent successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error printing book: ' + e.message };
+            }
+        `;
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            `  book.print(${printDialog}, PrinterPresetTypes.${printerPreset});`,
-            '  book.close();',
-            '  "Book print job sent successfully";',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Print Book");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Print Book") :
+            formatErrorResponse(result?.error || 'Failed to print book', "Print Book");
     }
 
     /**
@@ -441,43 +435,46 @@ export class BookHandlers {
             synchronizeTrapStyle
         } = args;
 
-        const escapedBookPath = escapeJsxString(bookPath);
+        const props = {
+            automaticPagination,
+            automaticDocumentConversion,
+            insertBlankPage,
+            mergeIdenticalLayers,
+            synchronizeBulletNumberingList,
+            synchronizeCellStyle,
+            synchronizeCharacterStyle,
+            synchronizeConditionalText,
+            synchronizeCrossReferenceFormat,
+            synchronizeMasterPage,
+            synchronizeObjectStyle,
+            synchronizeParagraphStyle,
+            synchronizeSwatch,
+            synchronizeTableOfContentStyle,
+            synchronizeTableStyle,
+            synchronizeTextVariable,
+            synchronizeTrapStyle
+        };
+        // Remove undefined values
+        Object.keys(props).forEach(k => props[k] === undefined && delete props[k]);
 
-        const script = [
-            `var bookFile = File("${escapedBookPath}");`,
-            '',
-            'if (!bookFile.exists) {',
-            `  "Book file not found: ${escapedBookPath}";`,
-            '} else {',
-            '  var book = app.open(bookFile);',
-            '  try {',
-            ...(automaticPagination !== undefined ? [`    book.automaticPagination = ${automaticPagination};`] : []),
-            ...(automaticDocumentConversion !== undefined ? [`    book.automaticDocumentConversion = ${automaticDocumentConversion};`] : []),
-            ...(insertBlankPage !== undefined ? [`    book.insertBlankPage = ${insertBlankPage};`] : []),
-            ...(mergeIdenticalLayers !== undefined ? [`    book.mergeIdenticalLayers = ${mergeIdenticalLayers};`] : []),
-            ...(synchronizeBulletNumberingList !== undefined ? [`    book.synchronizeBulletNumberingList = ${synchronizeBulletNumberingList};`] : []),
-            ...(synchronizeCellStyle !== undefined ? [`    book.synchronizeCellStyle = ${synchronizeCellStyle};`] : []),
-            ...(synchronizeCharacterStyle !== undefined ? [`    book.synchronizeCharacterStyle = ${synchronizeCharacterStyle};`] : []),
-            ...(synchronizeConditionalText !== undefined ? [`    book.synchronizeConditionalText = ${synchronizeConditionalText};`] : []),
-            ...(synchronizeCrossReferenceFormat !== undefined ? [`    book.synchronizeCrossReferenceFormat = ${synchronizeCrossReferenceFormat};`] : []),
-            ...(synchronizeMasterPage !== undefined ? [`    book.synchronizeMasterPage = ${synchronizeMasterPage};`] : []),
-            ...(synchronizeObjectStyle !== undefined ? [`    book.synchronizeObjectStyle = ${synchronizeObjectStyle};`] : []),
-            ...(synchronizeParagraphStyle !== undefined ? [`    book.synchronizeParagraphStyle = ${synchronizeParagraphStyle};`] : []),
-            ...(synchronizeSwatch !== undefined ? [`    book.synchronizeSwatch = ${synchronizeSwatch};`] : []),
-            ...(synchronizeTableOfContentStyle !== undefined ? [`    book.synchronizeTableOfContentStyle = ${synchronizeTableOfContentStyle};`] : []),
-            ...(synchronizeTableStyle !== undefined ? [`    book.synchronizeTableStyle = ${synchronizeTableStyle};`] : []),
-            ...(synchronizeTextVariable !== undefined ? [`    book.synchronizeTextVariable = ${synchronizeTextVariable};`] : []),
-            ...(synchronizeTrapStyle !== undefined ? [`    book.synchronizeTrapStyle = ${synchronizeTrapStyle};`] : []),
-            '    book.save();',
-            '    "Book properties updated successfully";',
-            '  } catch (error) {',
-            '    "Error updating book properties: " + error.message;',
-            '  }',
-            '  book.close();',
-            '}'
-        ].join('\n');
+        const code = `
+            try {
+                const book = app.open(${JSON.stringify(bookPath)});
+                const props = ${JSON.stringify(props)};
+                for (const key of Object.keys(props)) {
+                    try { book[key] = props[key]; } catch(e) {}
+                }
+                book.save();
+                book.close();
+                return { success: true, message: 'Book properties updated successfully' };
+            } catch(e) {
+                return { success: false, error: 'Error updating book properties: ' + e.message };
+            }
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Set Book Properties");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(result.message, "Set Book Properties") :
+            formatErrorResponse(result?.error || 'Failed to set book properties', "Set Book Properties");
     }
-} 
+}

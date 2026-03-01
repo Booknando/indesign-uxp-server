@@ -2,26 +2,18 @@
  * Utility handlers for InDesign MCP Server
  */
 import { ScriptExecutor } from '../core/scriptExecutor.js';
-import { formatResponse, formatErrorResponse, escapeJsxString } from '../utils/stringUtils.js';
+import { formatResponse, formatErrorResponse } from '../utils/stringUtils.js';
 import { sessionManager } from '../core/sessionManager.js';
 
 export class UtilityHandlers {
     /**
-     * Execute custom InDesign code
+     * Execute custom InDesign code via UXP
      */
     static async executeInDesignCode(args) {
         const { code } = args;
-        const escapedCode = escapeJsxString(code);
 
-        const script = [
-            'try {',
-            `  ${escapedCode}`,
-            '} catch (error) {',
-            '  "Error executing code: " + error.message;',
-            '}'
-        ].join('\n');
-
-        const result = await ScriptExecutor.executeInDesignScript(script);
+        // Pass user code directly through to UXP — it runs async with app in scope
+        const result = await ScriptExecutor.executeViaUXP(code);
         return formatResponse(result, "Execute InDesign Code");
     }
 
@@ -29,37 +21,53 @@ export class UtilityHandlers {
      * View document information and current state
      */
     static async viewDocument() {
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var info = "=== DOCUMENT VIEW ===\\n";',
-            '  info += "Document: " + doc.name + "\\n";',
-            '  info += "Pages: " + doc.pages.length + "\\n";',
-            '  info += "Active Page: " + (doc.activePage ? doc.activePage.name : "None") + "\\n";',
-            '  info += "Zoom: " + app.activeWindow.zoomPercentage + "%\\n";',
-            '  info += "View Mode: " + app.activeWindow.displaySettings.overprintPreview + "\\n";',
-            '',
-            '  // Page information',
-            '  if (doc.pages.length > 0) {',
-            '    var page = doc.pages[0];',
-            '    info += "\\n=== FIRST PAGE INFO ===\\n";',
-            '    info += "Page Name: " + page.name + "\\n";',
-            '    info += "Page Width: " + page.bounds[3] - page.bounds[1] + "\\n";',
-            '    info += "Page Height: " + page.bounds[2] - page.bounds[0] + "\\n";',
-            '    info += "Text Frames: " + page.textFrames.length + "\\n";',
-            '    info += "Rectangles: " + page.rectangles.length + "\\n";',
-            '    info += "Ovals: " + page.ovals.length + "\\n";',
-            '    info += "Polygons: " + page.polygons.length + "\\n";',
-            '  }',
-            '',
-            '  info;',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) return { success: false, error: 'No document open' };
+            const doc = app.activeDocument;
+            let zoom = null;
+            let viewMode = null;
+            try {
+                zoom = app.activeWindow.zoomPercentage;
+                viewMode = app.activeWindow.displaySettings?.overprintPreview ?? null;
+            } catch(e) {}
+            let activePageName = null;
+            try { activePageName = doc.activePage ? doc.activePage.name : null; } catch(e) {}
+            const pageCount = doc.pages.length;
+            let firstPage = null;
+            if (pageCount > 0) {
+                const page = doc.pages.item(0);
+                let pageWidth = null;
+                let pageHeight = null;
+                try {
+                    const b = page.bounds;
+                    pageWidth = b[3] - b[1];
+                    pageHeight = b[2] - b[0];
+                } catch(e) {}
+                firstPage = {
+                    name: page.name,
+                    width: pageWidth,
+                    height: pageHeight,
+                    textFrames: page.textFrames.length,
+                    rectangles: page.rectangles.length,
+                    ovals: page.ovals.length,
+                    polygons: page.polygons.length
+                };
+            }
+            return {
+                success: true,
+                documentName: doc.name,
+                pages: pageCount,
+                activePage: activePageName,
+                zoom,
+                viewMode,
+                firstPage
+            };
+        `;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "View Document");
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success
+            ? formatResponse(result, "View Document")
+            : formatErrorResponse(result?.error || 'Failed to view document', "View Document");
     }
 
     /**
@@ -77,4 +85,4 @@ export class UtilityHandlers {
         sessionManager.clearSession();
         return formatResponse("Session data cleared successfully", "Clear Session");
     }
-} 
+}

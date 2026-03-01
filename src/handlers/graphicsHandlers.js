@@ -37,67 +37,58 @@ export class GraphicsHandlers {
             }
         }
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '  var rectangle;',
-            '',
-            '  try {',
-            '    // Create rectangle',
-            `    rectangle = page.rectangles.add();`,
-            `    rectangle.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];`,
-            '',
-            '    // Apply fill color',
-            `    if ("${fillColor}" !== "") {`,
-            '      try {',
-            `        rectangle.fillColor = doc.colors.itemByName("${fillColor}");`,
-            '      } catch (colorError) {',
-            '        // Use default color if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    // Apply stroke color',
-            `    if ("${strokeColor}" !== "") {`,
-            '      try {',
-            `        rectangle.strokeColor = doc.colors.itemByName("${strokeColor}");`,
-            `        rectangle.strokeWeight = ${strokeWidth};`,
-            '      } catch (colorError) {',
-            '        // Use default stroke if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    // Apply corner radius',
-            `    if (${cornerRadius} > 0) {`,
-            `      rectangle.topLeftCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      rectangle.topRightCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      rectangle.bottomLeftCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      rectangle.bottomRightCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      rectangle.cornerRadius = ${cornerRadius};`,
-            '    }',
-            '',
-            '    "Rectangle created successfully";',
-            '  } catch (error) {',
-            '    "Error creating rectangle: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
+            try {
+                const rect = page.rectangles.add();
+                rect.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];
 
-        // Store the created item info in session
-        sessionManager.setLastCreatedItem({
-            type: 'rectangle',
-            position: positioning,
-            fillColor: fillColor,
-            strokeColor: strokeColor,
-            strokeWidth: strokeWidth,
-            cornerRadius: cornerRadius
-        });
+                if (${JSON.stringify(fillColor || '')}) {
+                    try { rect.fillColor = doc.colors.itemByName(${JSON.stringify(fillColor || '')}); } catch(e) {}
+                }
+                if (${JSON.stringify(strokeColor || '')}) {
+                    try {
+                        rect.strokeColor = doc.colors.itemByName(${JSON.stringify(strokeColor || '')});
+                        rect.strokeWeight = ${strokeWidth};
+                    } catch(e) {}
+                }
+                if (${cornerRadius} > 0) {
+                    const { CornerOptions } = require('indesign');
+                    rect.topLeftCornerOption = CornerOptions.roundedCorner;
+                    rect.topRightCornerOption = CornerOptions.roundedCorner;
+                    rect.bottomLeftCornerOption = CornerOptions.roundedCorner;
+                    rect.bottomRightCornerOption = CornerOptions.roundedCorner;
+                    rect.cornerRadius = ${cornerRadius};
+                }
 
-        return formatResponse(result, "Create Rectangle");
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error creating rectangle: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+
+        if (result?.success) {
+            // Store the created item info in session
+            sessionManager.setLastCreatedItem({
+                type: 'rectangle',
+                position: positioning,
+                fillColor: fillColor,
+                strokeColor: strokeColor,
+                strokeWidth: strokeWidth,
+                cornerRadius: cornerRadius
+            });
+        }
+
+        return result?.success ?
+            formatResponse('Rectangle created successfully', "Create Rectangle") :
+            formatErrorResponse(result?.error || 'Failed to create rectangle', "Create Rectangle");
     }
 
     /**
@@ -130,57 +121,49 @@ export class GraphicsHandlers {
             }
         }
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '  var ellipse;',
-            '',
-            '  try {',
-            '    // Create ellipse',
-            `    ellipse = page.ovals.add();`,
-            `    ellipse.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];`,
-            '',
-            '    // Apply fill color',
-            `    if ("${fillColor}" !== "") {`,
-            '      try {',
-            `        ellipse.fillColor = doc.colors.itemByName("${fillColor}");`,
-            '      } catch (colorError) {',
-            '        // Use default color if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    // Apply stroke color',
-            `    if ("${strokeColor}" !== "") {`,
-            '      try {',
-            `        ellipse.strokeColor = doc.colors.itemByName("${strokeColor}");`,
-            `        ellipse.strokeWeight = ${strokeWidth};`,
-            '      } catch (colorError) {',
-            '        // Use default stroke if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    "Ellipse created successfully";',
-            '  } catch (error) {',
-            '    "Error creating ellipse: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
+            try {
+                const ellipse = page.ovals.add();
+                ellipse.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];
 
-        // Store the created item info in session
-        sessionManager.setLastCreatedItem({
-            type: 'ellipse',
-            position: positioning,
-            fillColor: fillColor,
-            strokeColor: strokeColor,
-            strokeWidth: strokeWidth
-        });
+                if (${JSON.stringify(fillColor || '')}) {
+                    try { ellipse.fillColor = doc.colors.itemByName(${JSON.stringify(fillColor || '')}); } catch(e) {}
+                }
+                if (${JSON.stringify(strokeColor || '')}) {
+                    try {
+                        ellipse.strokeColor = doc.colors.itemByName(${JSON.stringify(strokeColor || '')});
+                        ellipse.strokeWeight = ${strokeWidth};
+                    } catch(e) {}
+                }
 
-        return formatResponse(result, "Create Ellipse");
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error creating ellipse: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+
+        if (result?.success) {
+            // Store the created item info in session
+            sessionManager.setLastCreatedItem({
+                type: 'ellipse',
+                position: positioning,
+                fillColor: fillColor,
+                strokeColor: strokeColor,
+                strokeWidth: strokeWidth
+            });
+        }
+
+        return result?.success ?
+            formatResponse('Ellipse created successfully', "Create Ellipse") :
+            formatErrorResponse(result?.error || 'Failed to create ellipse', "Create Ellipse");
     }
 
     /**
@@ -201,59 +184,51 @@ export class GraphicsHandlers {
         // Use session manager for positioning if coordinates not provided
         const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '  var polygon;',
-            '',
-            '  try {',
-            '    // Create polygon',
-            `    polygon = page.polygons.add();`,
-            `    polygon.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];`,
-            `    polygon.polygonSides = ${sides};`,
-            '',
-            '    // Apply fill color',
-            `    if ("${fillColor}" !== "") {`,
-            '      try {',
-            `        polygon.fillColor = doc.colors.itemByName("${fillColor}");`,
-            '      } catch (colorError) {',
-            '        // Use default color if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    // Apply stroke color',
-            `    if ("${strokeColor}" !== "") {`,
-            '      try {',
-            `        polygon.strokeColor = doc.colors.itemByName("${strokeColor}");`,
-            `        polygon.strokeWeight = ${strokeWidth};`,
-            '      } catch (colorError) {',
-            '        // Use default stroke if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    "Polygon created successfully";',
-            '  } catch (error) {',
-            '    "Error creating polygon: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
+            try {
+                const polygon = page.polygons.add();
+                polygon.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];
+                polygon.numberOfSides = ${sides};
 
-        // Store the created item info in session
-        sessionManager.setLastCreatedItem({
-            type: 'polygon',
-            sides: sides,
-            position: positioning,
-            fillColor: fillColor,
-            strokeColor: strokeColor,
-            strokeWidth: strokeWidth
-        });
+                if (${JSON.stringify(fillColor || '')}) {
+                    try { polygon.fillColor = doc.colors.itemByName(${JSON.stringify(fillColor || '')}); } catch(e) {}
+                }
+                if (${JSON.stringify(strokeColor || '')}) {
+                    try {
+                        polygon.strokeColor = doc.colors.itemByName(${JSON.stringify(strokeColor || '')});
+                        polygon.strokeWeight = ${strokeWidth};
+                    } catch(e) {}
+                }
 
-        return formatResponse(result, "Create Polygon");
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error creating polygon: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+
+        if (result?.success) {
+            // Store the created item info in session
+            sessionManager.setLastCreatedItem({
+                type: 'polygon',
+                sides: sides,
+                position: positioning,
+                fillColor: fillColor,
+                strokeColor: strokeColor,
+                strokeWidth: strokeWidth
+            });
+        }
+
+        return result?.success ?
+            formatResponse('Polygon created successfully', "Create Polygon") :
+            formatErrorResponse(result?.error || 'Failed to create polygon', "Create Polygon");
     }
 
     /**
@@ -327,89 +302,89 @@ export class GraphicsHandlers {
             transparency = 100
         } = args;
 
-        const escapedName = escapeJsxString(name);
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '',
-            '  try {',
-            `    var objectStyle = doc.objectStyles.add({name: "${escapedName}"});`,
-            '',
-            '    // Apply fill color',
-            `    if ("${fillColor}" !== "") {`,
-            '      try {',
-            `        objectStyle.fillColor = doc.colors.itemByName("${fillColor}");`,
-            '      } catch (colorError) {',
-            '        // Use default color if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    // Apply stroke color',
-            `    if ("${strokeColor}" !== "") {`,
-            '      try {',
-            `        objectStyle.strokeColor = doc.colors.itemByName("${strokeColor}");`,
-            `        objectStyle.strokeWeight = ${strokeWeight};`,
-            '      } catch (colorError) {',
-            '        // Use default stroke if specified color not found',
-            '      }',
-            '    }',
-            '',
-            '    // Apply corner radius',
-            `    if (${cornerRadius} > 0) {`,
-            `      objectStyle.topLeftCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      objectStyle.topRightCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      objectStyle.bottomLeftCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      objectStyle.bottomRightCornerOption = CornerOptions.ROUNDED_CORNER;`,
-            `      objectStyle.cornerRadius = ${cornerRadius};`,
-            '    }',
-            '',
-            '    // Apply transparency',
-            `    if (${transparency} < 100) {`,
-            `      objectStyle.transparencySettings.blendingSettings.opacity = ${transparency};`,
-            '    }',
-            '',
-            `    "Object style '${escapedName}' created successfully";`,
-            '  } catch (error) {',
-            '    "Error creating object style: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+            try {
+                const objectStyle = doc.objectStyles.add({ name: ${JSON.stringify(name)} });
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Create Object Style");
+                if (${JSON.stringify(fillColor || '')}) {
+                    try { objectStyle.fillColor = doc.colors.itemByName(${JSON.stringify(fillColor || '')}); } catch(e) {}
+                }
+                if (${JSON.stringify(strokeColor || '')}) {
+                    try {
+                        objectStyle.strokeColor = doc.colors.itemByName(${JSON.stringify(strokeColor || '')});
+                        objectStyle.strokeWeight = ${strokeWeight};
+                    } catch(e) {}
+                }
+                if (${cornerRadius} > 0) {
+                    const { CornerOptions } = require('indesign');
+                    objectStyle.topLeftCornerOption = CornerOptions.roundedCorner;
+                    objectStyle.topRightCornerOption = CornerOptions.roundedCorner;
+                    objectStyle.bottomLeftCornerOption = CornerOptions.roundedCorner;
+                    objectStyle.bottomRightCornerOption = CornerOptions.roundedCorner;
+                    objectStyle.cornerRadius = ${cornerRadius};
+                }
+                if (${transparency} < 100) {
+                    try { objectStyle.transparencySettings.blendingSettings.opacity = ${transparency}; } catch(e) {}
+                }
+
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error creating object style: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(`Object style '${name}' created successfully`, "Create Object Style") :
+            formatErrorResponse(result?.error || 'Failed to create object style', "Create Object Style");
     }
 
     /**
      * List all object styles
      */
     static async listObjectStyles() {
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var info = "=== OBJECT STYLES ===\\n";',
-            '',
-            '  for (var i = 0; i < doc.objectStyles.length; i++) {',
-            '    var style = doc.objectStyles[i];',
-            '    if (style.isValid) {',
-            '      info += "Name: " + style.name + "\\n";',
-            '      info += "  Fill Color: " + (style.fillColor ? style.fillColor.name : "None") + "\\n";',
-            '      info += "  Stroke Color: " + (style.strokeColor ? style.strokeColor.name : "None") + "\\n";',
-            '      info += "  Stroke Weight: " + style.strokeWeight + "\\n";',
-            '      info += "  Corner Radius: " + style.cornerRadius + "\\n\\n";',
-            '    }',
-            '  }',
-            '',
-            '  info;',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "List Object Styles");
+            const styles = [];
+            for (let i = 0; i < doc.objectStyles.length; i++) {
+                const style = doc.objectStyles.item(i);
+                if (style.isValid) {
+                    styles.push({
+                        name: style.name,
+                        fillColor: style.fillColor ? style.fillColor.name : 'None',
+                        strokeColor: style.strokeColor ? style.strokeColor.name : 'None',
+                        strokeWeight: style.strokeWeight,
+                        cornerRadius: style.cornerRadius
+                    });
+                }
+            }
+
+            return { success: true, styles: styles };
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        if (result?.success) {
+            const lines = ['=== OBJECT STYLES ==='];
+            for (const s of (result.styles || [])) {
+                lines.push(`Name: ${s.name}`);
+                lines.push(`  Fill Color: ${s.fillColor}`);
+                lines.push(`  Stroke Color: ${s.strokeColor}`);
+                lines.push(`  Stroke Weight: ${s.strokeWeight}`);
+                lines.push(`  Corner Radius: ${s.cornerRadius}`);
+                lines.push('');
+            }
+            return formatResponse(lines.join('\n'), "List Object Styles");
+        }
+        return formatErrorResponse(result?.error || 'Failed to list object styles', "List Object Styles");
     }
 
     /**
@@ -422,56 +397,47 @@ export class GraphicsHandlers {
             itemIndex = 0
         } = args;
 
-        const escapedStyleName = escapeJsxString(styleName);
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '',
-            '  try {',
-            `    var objectStyle = doc.objectStyles.itemByName("${escapedStyleName}");`,
-            '    if (!objectStyle.isValid) {',
-            `      "Object style '${escapedStyleName}' not found";`,
-            '    } else {',
-            `      var item;`,
-            `      if ("${itemType}" === "rectangle") {`,
-            `        if (${itemIndex} >= page.rectangles.length) {`,
-            '          "Rectangle index out of range";',
-            '        } else {',
-            `          item = page.rectangles[${itemIndex}];`,
-            '        }',
-            `      } else if ("${itemType}" === "ellipse") {`,
-            `        if (${itemIndex} >= page.ovals.length) {`,
-            '          "Ellipse index out of range";',
-            '        } else {',
-            `          item = page.ovals[${itemIndex}];`,
-            '        }',
-            `      } else if ("${itemType}" === "polygon") {`,
-            `        if (${itemIndex} >= page.polygons.length) {`,
-            '          "Polygon index out of range";',
-            '        } else {',
-            `          item = page.polygons[${itemIndex}];`,
-            '        }',
-            '      } else {',
-            '        "Invalid item type. Use: rectangle, ellipse, or polygon";',
-            '      }',
-            '',
-            '      if (item) {',
-            '        item.appliedObjectStyle = objectStyle;',
-            `        "Object style '${escapedStyleName}' applied successfully";`,
-            '      }',
-            '    }',
-            '  } catch (error) {',
-            '    "Error applying object style: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+            try {
+                const objectStyle = doc.objectStyles.itemByName(${JSON.stringify(styleName)});
+                if (!objectStyle.isValid) {
+                    return { success: false, error: "Object style '${styleName}' not found" };
+                }
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Apply Object Style");
+                let item;
+                const type = ${JSON.stringify(itemType)};
+                const idx = ${itemIndex};
+
+                if (type === 'rectangle') {
+                    if (idx >= page.rectangles.length) return { success: false, error: 'Rectangle index out of range' };
+                    item = page.rectangles.item(idx);
+                } else if (type === 'ellipse') {
+                    if (idx >= page.ovals.length) return { success: false, error: 'Ellipse index out of range' };
+                    item = page.ovals.item(idx);
+                } else if (type === 'polygon') {
+                    if (idx >= page.polygons.length) return { success: false, error: 'Polygon index out of range' };
+                    item = page.polygons.item(idx);
+                } else {
+                    return { success: false, error: 'Invalid item type. Use: rectangle, ellipse, or polygon' };
+                }
+
+                item.appliedObjectStyle = objectStyle;
+                return { success: true };
+            } catch(e) {
+                return { success: false, error: 'Error applying object style: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        return result?.success ?
+            formatResponse(`Object style '${styleName}' applied successfully`, "Apply Object Style") :
+            formatErrorResponse(result?.error || 'Failed to apply object style', "Apply Object Style");
     }
 
     /**
@@ -480,55 +446,67 @@ export class GraphicsHandlers {
     static async getImageInfo(args) {
         const { itemIndex = 0 } = args;
 
-        const script = [
-            'if (app.documents.length === 0) {',
-            '  "No document open";',
-            '} else {',
-            '  var doc = app.activeDocument;',
-            '  var page = doc.pages[0];',
-            '  var info = "=== IMAGE INFORMATION ===\\n";',
-            '',
-            '  try {',
-            '    // Find images in rectangles',
-            '    var imageCount = 0;',
-            '    for (var i = 0; i < page.rectangles.length; i++) {',
-            '      var rect = page.rectangles[i];',
-            '      if (rect.graphics.length > 0) {',
-            '        for (var j = 0; j < rect.graphics.length; j++) {',
-            '          var graphic = rect.graphics[j];',
-            '          if (graphic.constructor.name === "Image") {',
-            `            if (imageCount === ${itemIndex}) {`,
-            '              info += "Image " + imageCount + ":\\n";',
-            '              info += "  File Path: " + graphic.itemLink.filePath + "\\n";',
-            '              info += "  File Name: " + graphic.itemLink.name + "\\n";',
-            '              info += "  Link Status: " + graphic.itemLink.status + "\\n";',
-            '              info += "  Image Type: " + graphic.imageTypeName + "\\n";',
-            '              info += "  Actual PPI: " + graphic.actualPpi + "\\n";',
-            '              info += "  Effective PPI: " + graphic.effectivePpi + "\\n";',
-            '              info += "  Geometric Bounds: " + graphic.geometricBounds + "\\n";',
-            '              info += "  Visible Bounds: " + graphic.visibleBounds + "\\n";',
-            '              break;',
-            '            }',
-            '            imageCount++;',
-            '          }',
-            '        }',
-            '      }',
-            '    }',
-            '',
-            `    if (imageCount === 0) {`,
-            '      "No images found on page";',
-            `    } else if (imageCount <= ${itemIndex}) {`,
-            `      "Image index ${itemIndex} not found. Total images: " + imageCount;`,
-            '    } else {',
-            '      info;',
-            '    }',
-            '  } catch (error) {',
-            '    "Error getting image information: " + error.message;',
-            '  }',
-            '}'
-        ].join('\n');
+        const code = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const page = doc.pages.item(0);
 
-        const result = await ScriptExecutor.executeInDesignScript(script);
-        return formatResponse(result, "Get Image Info");
+            try {
+                const allGraphics = page.allGraphics;
+                if (!allGraphics || allGraphics.length === 0) {
+                    return { success: false, error: 'No images found on page' };
+                }
+
+                const idx = ${itemIndex};
+                if (idx >= allGraphics.length) {
+                    return { success: false, error: 'Image index ' + idx + ' not found. Total images: ' + allGraphics.length };
+                }
+
+                const graphic = allGraphics[idx];
+                let filePath = '';
+                let fileName = '';
+                let linkStatus = '';
+                try {
+                    filePath = graphic.itemLink ? graphic.itemLink.filePath : '';
+                    fileName = graphic.itemLink ? graphic.itemLink.name : '';
+                    linkStatus = graphic.itemLink ? String(graphic.itemLink.status) : '';
+                } catch(e) {}
+
+                return {
+                    success: true,
+                    index: idx,
+                    filePath: filePath,
+                    fileName: fileName,
+                    linkStatus: linkStatus,
+                    imageTypeName: graphic.imageTypeName || '',
+                    actualPpi: graphic.actualPpi || [],
+                    effectivePpi: graphic.effectivePpi || [],
+                    geometricBounds: graphic.geometricBounds || [],
+                    visibleBounds: graphic.visibleBounds || []
+                };
+            } catch(e) {
+                return { success: false, error: 'Error getting image information: ' + e.message };
+            }
+        `;
+
+        const result = await ScriptExecutor.executeViaUXP(code);
+        if (result?.success) {
+            const lines = [
+                '=== IMAGE INFORMATION ===',
+                `Image ${result.index}:`,
+                `  File Path: ${result.filePath}`,
+                `  File Name: ${result.fileName}`,
+                `  Link Status: ${result.linkStatus}`,
+                `  Image Type: ${result.imageTypeName}`,
+                `  Actual PPI: ${Array.isArray(result.actualPpi) ? result.actualPpi.join(', ') : result.actualPpi}`,
+                `  Effective PPI: ${Array.isArray(result.effectivePpi) ? result.effectivePpi.join(', ') : result.effectivePpi}`,
+                `  Geometric Bounds: ${Array.isArray(result.geometricBounds) ? result.geometricBounds.join(', ') : result.geometricBounds}`,
+                `  Visible Bounds: ${Array.isArray(result.visibleBounds) ? result.visibleBounds.join(', ') : result.visibleBounds}`
+            ];
+            return formatResponse(lines.join('\n'), "Get Image Info");
+        }
+        return formatErrorResponse(result?.error || 'Failed to get image info', "Get Image Info");
     }
 } 

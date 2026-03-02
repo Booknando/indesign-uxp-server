@@ -122,7 +122,6 @@ export const contentToolDefinitions = [
                 tool: {
                     type: 'string',
                     description: 'Specific tool name to get help for (optional)',
-                    default: null
                 },
                 category: {
                     type: 'string',
@@ -137,7 +136,6 @@ export const contentToolDefinitions = [
                     default: 'summary'
                 }
             },
-            required: [],
         },
     },
     {

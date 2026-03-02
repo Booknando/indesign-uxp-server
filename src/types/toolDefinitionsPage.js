@@ -265,7 +265,6 @@ export const pageToolDefinitions = [
                 backgroundColor: { type: 'string', description: 'Background color name (must be a color swatch in the document)', default: 'White' },
                 opacity: { type: 'number', description: 'Background opacity percentage (0-100)', default: 100 },
             },
-            required: [],
         },
     },
 ]; 

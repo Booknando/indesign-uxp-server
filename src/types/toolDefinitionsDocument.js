@@ -150,7 +150,7 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                preferenceType: { type: 'string', enum: ['GENERAL', 'GRID', 'GUIDES', 'HYPHENATION', 'STORY', 'TEXT', 'VIEW'], description: 'Type of preferences to set', required: true },
+                preferenceType: { type: 'string', enum: ['GENERAL', 'GRID', 'GUIDES', 'HYPHENATION', 'STORY', 'TEXT', 'VIEW'], description: 'Type of preferences to set' },
                 preferences: { type: 'object', description: 'Preference values to set' },
             },
             required: ['preferenceType', 'preferences'],
@@ -175,7 +175,7 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                searchText: { type: 'string', description: 'Text to search for', required: true },
+                searchText: { type: 'string', description: 'Text to search for' },
                 replaceText: { type: 'string', description: 'Text to replace with (optional)' },
                 caseSensitive: { type: 'boolean', description: 'Case sensitive search', default: false },
                 wholeWord: { type: 'boolean', description: 'Whole word search', default: false },
@@ -228,8 +228,8 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                sourceText: { type: 'string', description: 'Text to link', required: true },
-                destination: { type: 'string', description: 'URL or destination', required: true },
+                sourceText: { type: 'string', description: 'Text to link' },
+                destination: { type: 'string', description: 'URL or destination' },
                 linkType: { type: 'string', enum: ['URL', 'PAGE', 'TEXT'], description: 'Type of hyperlink', default: 'URL' },
                 pageIndex: { type: 'number', description: 'Target page index (for page links)' },
             },
@@ -249,7 +249,7 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                startPage: { type: 'number', description: 'Page to start section on', required: true },
+                startPage: { type: 'number', description: 'Page to start section on' },
                 sectionPrefix: { type: 'string', description: 'Section prefix' },
                 startNumber: { type: 'number', description: 'Starting page number', default: 1 },
                 numberingStyle: { type: 'string', enum: ['ARABIC', 'ROMAN_UPPER', 'ROMAN_LOWER', 'LETTER_UPPER', 'LETTER_LOWER'], description: 'Numbering style', default: 'ARABIC' },
@@ -276,7 +276,7 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                filePath: { type: 'string', description: 'Path to save XML file', required: true },
+                filePath: { type: 'string', description: 'Path to save XML file' },
                 includeImages: { type: 'boolean', description: 'Include images in export', default: true },
                 includeStyles: { type: 'boolean', description: 'Include style information', default: true },
             },
@@ -291,7 +291,7 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                cloudName: { type: 'string', description: 'Name for the cloud document', required: true },
+                cloudName: { type: 'string', description: 'Name for the cloud document' },
                 includeAssets: { type: 'boolean', description: 'Include linked assets', default: true },
             },
             required: ['cloudName'],
@@ -303,7 +303,7 @@ export const documentToolDefinitions = [
         inputSchema: {
             type: 'object',
             properties: {
-                cloudDocumentId: { type: 'string', description: 'Cloud document ID', required: true },
+                cloudDocumentId: { type: 'string', description: 'Cloud document ID' },
             },
             required: ['cloudDocumentId'],
         },

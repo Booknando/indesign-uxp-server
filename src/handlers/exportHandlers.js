@@ -21,7 +21,7 @@ export class ExportHandlers {
             }
             const doc = app.activeDocument;
             try {
-                doc.exportFile(ExportFormat.pdfType, ${JSON.stringify(filePath)}, false, ${JSON.stringify(preset)});
+                await doc.exportFile(ExportFormat.pdfType, ${JSON.stringify(filePath)}, false, ${JSON.stringify(preset)});
                 return { success: true, message: 'PDF exported to ' + ${JSON.stringify(filePath)} };
             } catch(e) {
                 return { success: false, error: 'Export failed: ' + e.message };
@@ -79,14 +79,14 @@ export class ExportHandlers {
                         const pageNum = parseInt(pages[i]) - 1;
                         if (pageNum >= 0 && pageNum < doc.pages.length) {
                             const fileName = folder + '/page_' + (pageNum + 1) + '.' + ext;
-                            doc.pages.item(pageNum).exportFile(exportFormat, fileName, false);
+                            await doc.pages.item(pageNum).exportFile(exportFormat, fileName, false);
                             exportedCount++;
                         }
                     }
                 } else {
                     for (let i = 0; i < doc.pages.length; i++) {
                         const fileName = folder + '/page_' + (i + 1) + '.' + ext;
-                        doc.pages.item(i).exportFile(exportFormat, fileName, false);
+                        await doc.pages.item(i).exportFile(exportFormat, fileName, false);
                         exportedCount++;
                     }
                 }

@@ -55,7 +55,7 @@ export class GroupHandlers {
             const items = [];
             for (let i = 0; i < indices.length; i++) {
                 if (indices[i] < page.allPageItems.length) {
-                    items.push(page.allPageItems[indices[i]]);
+                    items.push(page.allPageItems.item(indices[i]));
                 }
             }
             if (items.length < 2) return { success: false, error: 'Not enough valid items to create a group' };
@@ -99,7 +99,7 @@ export class GroupHandlers {
             if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
-            const item = page.allPageItems[${groupIndex}];
+            const item = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
                 isGroup = typeof item.pageItems !== 'undefined' || item.constructor?.name === 'Group';
@@ -133,7 +133,7 @@ export class GroupHandlers {
             if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
-            const item = page.allPageItems[${groupIndex}];
+            const item = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
                 isGroup = typeof item.pageItems !== 'undefined' || item.constructor?.name === 'Group';
@@ -142,7 +142,7 @@ export class GroupHandlers {
             const contents = [];
             try {
                 for (let i = 0; i < item.allPageItems.length; i++) {
-                    const groupItem = item.allPageItems[i];
+                    const groupItem = item.allPageItems.item(i);
                     let type = 'Unknown';
                     try { type = groupItem.constructor?.name || 'Unknown'; } catch(e) {}
                     contents.push({ index: i, type, id: groupItem.id });
@@ -178,14 +178,14 @@ export class GroupHandlers {
             if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
-            const group = page.allPageItems[${groupIndex}];
+            const group = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
                 isGroup = typeof group.pageItems !== 'undefined' || group.constructor?.name === 'Group';
             } catch(e) {}
             if (!isGroup) return { success: false, error: 'Selected item is not a group' };
             if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Item index out of range' };
-            const item = page.allPageItems[${itemIndex}];
+            const item = page.allPageItems.item(${itemIndex});
             try {
                 group.add(item);
             } catch(e) {
@@ -212,7 +212,7 @@ export class GroupHandlers {
             if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
-            const group = page.allPageItems[${groupIndex}];
+            const group = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
                 isGroup = typeof group.pageItems !== 'undefined' || group.constructor?.name === 'Group';
@@ -221,7 +221,7 @@ export class GroupHandlers {
             let groupItems;
             try { groupItems = group.allPageItems; } catch(e) { return { success: false, error: 'Cannot access group items' }; }
             if (${itemIndex} >= groupItems.length) return { success: false, error: 'Item index out of range in group' };
-            const item = groupItems[${itemIndex}];
+            const item = groupItems.item(${itemIndex});
             const itemId = item.id;
             try {
                 group.remove(item);
@@ -250,7 +250,7 @@ export class GroupHandlers {
             const page = doc.pages.item(${pageIndex});
             const groups = [];
             for (let i = 0; i < page.allPageItems.length; i++) {
-                const item = page.allPageItems[i];
+                const item = page.allPageItems.item(i);
                 let isGroup = false;
                 try {
                     isGroup = typeof item.pageItems !== 'undefined' || item.constructor?.name === 'Group';
@@ -290,7 +290,7 @@ export class GroupHandlers {
             if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
-            const group = page.allPageItems[${groupIndex}];
+            const group = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
                 isGroup = typeof group.pageItems !== 'undefined' || group.constructor?.name === 'Group';

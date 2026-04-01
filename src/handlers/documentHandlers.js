@@ -69,7 +69,11 @@ export class DocumentHandlers {
             };
         `);
 
-        if (result && !result.error) {
+        if (result?.error) {
+            return formatErrorResponse(result.error, "Get Document Info");
+        }
+
+        if (result) {
             sessionManager.setActiveDocument({
                 name: result.name,
                 path: result.filePath,
@@ -124,8 +128,9 @@ export class DocumentHandlers {
             // Save current units, switch to points so numeric values are unambiguous
             const savedH = doc.viewPreferences.horizontalMeasurementUnits;
             const savedV = doc.viewPreferences.verticalMeasurementUnits;
-            doc.viewPreferences.horizontalMeasurementUnits = 2054188905; // POINTS
-            doc.viewPreferences.verticalMeasurementUnits   = 2054188905; // POINTS
+            const { MeasurementUnits } = require('indesign');
+            doc.viewPreferences.horizontalMeasurementUnits = MeasurementUnits.points;
+            doc.viewPreferences.verticalMeasurementUnits   = MeasurementUnits.points;
             doc.documentPreferences.pageWidth  = ${wPt};
             doc.documentPreferences.pageHeight = ${hPt};
             doc.documentPreferences.facingPages = ${facingPages};

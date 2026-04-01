@@ -21,7 +21,7 @@ export class HelpHandlers {
         text: {
             name: 'Text & Typography',
             description: 'Create and edit text frames, apply styles',
-            tools: ['create_text_frame', 'edit_text_frame', 'get_text_info', 'apply_paragraph_style', 'apply_character_style']
+            tools: ['create_text_frame', 'edit_text_frame', 'apply_paragraph_style', 'apply_character_style']
         },
         graphics: {
             name: 'Graphics & Images',

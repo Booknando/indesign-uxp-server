@@ -92,7 +92,7 @@ export class StyleHandlers {
                     if (color.isValid) style.fillColor = color;
                 } catch (e) {}
             }
-            style.fontStyle = ${JSON.stringify(bold ? 'Bold' : 'Regular')};
+            style.fontStyle = ${JSON.stringify(bold && italic ? 'Bold Italic' : bold ? 'Bold' : italic ? 'Italic' : 'Regular')};
             style.underline = ${underline};
             style.underlineOffset = ${underline ? 1 : 0};
             style.underlineWeight = ${underline ? 1 : 0};

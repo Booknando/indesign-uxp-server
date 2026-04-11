@@ -2,6 +2,7 @@
  * Comprehensive Document management handlers
  * Merged from documentHandlers.js and documentAdvancedHandlers.js
  */
+import { readFileSync } from 'fs';
 import { ScriptExecutor } from '../core/scriptExecutor.js';
 import { formatResponse, formatErrorResponse } from '../utils/stringUtils.js';
 import { sessionManager } from '../core/sessionManager.js';
@@ -48,7 +49,13 @@ export class DocumentHandlers {
                 const fp = await doc.filePath;
                 filePath = fp ? (fp.nativePath || fp.url || String(fp) || 'Unsaved') : 'Unsaved';
             } catch (e) {}
-            return {
+            // L3: switch to mm before reading dimensions so sessionManager always gets mm values
+            const { MeasurementUnits } = require('indesign');
+            const savedH = doc.viewPreferences.horizontalMeasurementUnits;
+            const savedV = doc.viewPreferences.verticalMeasurementUnits;
+            doc.viewPreferences.horizontalMeasurementUnits = MeasurementUnits.millimeters;
+            doc.viewPreferences.verticalMeasurementUnits   = MeasurementUnits.millimeters;
+            const info = {
                 name: doc.name,
                 filePath,
                 pages: doc.pages.length,
@@ -67,6 +74,9 @@ export class DocumentHandlers {
                 marginLeft: doc.marginPreferences.left,
                 marginRight: doc.marginPreferences.right
             };
+            doc.viewPreferences.horizontalMeasurementUnits = savedH;
+            doc.viewPreferences.verticalMeasurementUnits   = savedV;
+            return info;
         `);
 
         if (result?.error) {
@@ -308,6 +318,64 @@ export class DocumentHandlers {
     static async dataMerge(args) {
         const { dataSource, targetPage = 0, createNewPages = false, removeUnusedPages = false } = args;
 
+        // H7: Pre-validate CSV fields against document template placeholders
+
+        // Step 1: parse CSV headers from disk (Node.js side)
+        let csvFields;
+        try {
+            const content = readFileSync(dataSource, 'utf8');
+            const firstLine = content.split(/\r?\n/)[0];
+            if (!firstLine || !firstLine.trim()) {
+                return formatErrorResponse('Data source CSV is empty or has no header row', 'Data Merge');
+            }
+            // Handle both quoted and unquoted CSV headers
+            csvFields = firstLine.split(',').map(f => f.trim().replace(/^"|"$/g, ''));
+        } catch (e) {
+            return formatErrorResponse(`Cannot read data source file: ${e.message}`, 'Data Merge');
+        }
+
+        // Step 2: extract <<field>> placeholders from document via UXP
+        const scanCode = `
+            if (app.documents.length === 0) {
+                return { success: false, error: 'No document open' };
+            }
+            const doc = app.activeDocument;
+            const placeholders = new Set();
+            const re = /<<([^>]+)>>/g;
+            for (let i = 0; i < doc.stories.length; i++) {
+                let text = '';
+                try { text = doc.stories.item(i).contents; } catch(e) {}
+                let m;
+                while ((m = re.exec(text)) !== null) {
+                    placeholders.add(m[1].trim());
+                }
+            }
+            return { success: true, placeholders: Array.from(placeholders) };
+        `;
+
+        const scanResult = await ScriptExecutor.executeViaUXP(scanCode);
+        if (!scanResult?.success) {
+            return formatErrorResponse(scanResult?.error || 'Failed to scan document for merge fields', 'Data Merge');
+        }
+
+        const templateFields = scanResult.placeholders;
+        if (templateFields.length === 0) {
+            return formatErrorResponse(
+                'No data merge placeholders found in document. Add <<FieldName>> markers to text frames before merging.',
+                'Data Merge'
+            );
+        }
+
+        // Step 3: every template placeholder must exist as a CSV column
+        const missingFromCSV = templateFields.filter(f => !csvFields.includes(f));
+        if (missingFromCSV.length > 0) {
+            return formatErrorResponse(
+                `Template placeholders not found in CSV: ${missingFromCSV.join(', ')}. CSV columns: ${csvFields.join(', ')}`,
+                'Data Merge'
+            );
+        }
+
+        // Step 4: validated — proceed with merge
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
@@ -711,6 +779,11 @@ export class DocumentHandlers {
     static async organizeDocumentLayers(args) {
         const { deleteEmptyLayers = false, mergeSimilarLayers = false, sortLayers = false } = args;
 
+        // L4: bulk layer ops run in one executeViaUXP call — InDesign batches a single
+        // script execution as one undo step ("Script" in history). app.doScript() with
+        // UndoModes.fastEntireScript is ExtendScript-era API and cannot be nested inside
+        // a running UXP script without risk of deadlock. Single-script grouping is the
+        // practical equivalent available in UXP.
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };

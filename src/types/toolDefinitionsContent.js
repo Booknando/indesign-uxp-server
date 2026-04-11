@@ -7,7 +7,7 @@ export const contentToolDefinitions = [
     // =================== TEXT MANAGEMENT ===================
     {
         name: 'create_text_frame',
-        description: 'Create a text frame on the active page',
+        description: 'Create a text frame on the specified page (defaults to active page in InDesign UI)',
         inputSchema: {
             type: 'object',
             properties: {
@@ -16,6 +16,7 @@ export const contentToolDefinitions = [
                 y: { type: 'number', description: 'Y position in mm', default: 10 },
                 width: { type: 'number', description: 'Width in mm', default: 100 },
                 height: { type: 'number', description: 'Height in mm', default: 50 },
+                pageIndex: { type: 'number', description: 'Page index (0-based). Omit to use the active page in InDesign.' },
                 fontSize: { type: 'number', description: 'Font size in points', default: 12 },
                 fontName: { type: 'string', description: 'Font name (use format: FontName\\tStyle)', default: 'Arial\\tRegular' },
                 textColor: { type: 'string', description: 'Text color (RGB hex or name)', default: 'Black' },
@@ -58,7 +59,7 @@ export const contentToolDefinitions = [
     },
     {
         name: 'create_table',
-        description: 'Create a table on the active page',
+        description: 'Create a table on the specified page (defaults to active page in InDesign UI)',
         inputSchema: {
             type: 'object',
             properties: {
@@ -68,6 +69,7 @@ export const contentToolDefinitions = [
                 y: { type: 'number', description: 'Y position in mm' },
                 width: { type: 'number', description: 'Table width in mm' },
                 height: { type: 'number', description: 'Table height in mm' },
+                pageIndex: { type: 'number', description: 'Page index (0-based). Omit to use the active page in InDesign.' },
                 headerRows: { type: 'number', description: 'Number of header rows', default: 1 },
                 headerColumns: { type: 'number', description: 'Number of header columns', default: 0 },
             },
@@ -92,7 +94,7 @@ export const contentToolDefinitions = [
     // =================== GRAPHICS MANAGEMENT ===================
     {
         name: 'place_image',
-        description: 'Place an image on the active page with scaling and fitting options',
+        description: 'Place an image on the specified page (defaults to active page in InDesign UI)',
         inputSchema: {
             type: 'object',
             properties: {
@@ -101,6 +103,7 @@ export const contentToolDefinitions = [
                 y: { type: 'number', description: 'Y position in mm', default: 10 },
                 width: { type: 'number', description: 'Width in mm' },
                 height: { type: 'number', description: 'Height in mm' },
+                pageIndex: { type: 'number', description: 'Page index (0-based). Omit to use the active page in InDesign.' },
                 linkImage: { type: 'boolean', description: 'Link the image', default: true },
                 scale: { type: 'number', description: 'Scale percentage (1-1000)', default: 100 },
                 fitMode: {
@@ -140,7 +143,7 @@ export const contentToolDefinitions = [
     },
     {
         name: 'create_rectangle',
-        description: 'Create a rectangle on the active page',
+        description: 'Create a rectangle on the specified page (defaults to active page in InDesign UI)',
         inputSchema: {
             type: 'object',
             properties: {
@@ -148,6 +151,7 @@ export const contentToolDefinitions = [
                 y: { type: 'number', description: 'Y position in mm' },
                 width: { type: 'number', description: 'Width in mm' },
                 height: { type: 'number', description: 'Height in mm' },
+                pageIndex: { type: 'number', description: 'Page index (0-based). Omit to use the active page in InDesign.' },
                 fillColor: { type: 'string', description: 'Fill color (RGB hex or swatch name)' },
                 strokeColor: { type: 'string', description: 'Stroke color' },
                 strokeWidth: { type: 'number', description: 'Stroke width in points', default: 1 },
@@ -158,7 +162,7 @@ export const contentToolDefinitions = [
     },
     {
         name: 'create_ellipse',
-        description: 'Create an ellipse on the active page',
+        description: 'Create an ellipse on the specified page (defaults to active page in InDesign UI)',
         inputSchema: {
             type: 'object',
             properties: {
@@ -166,6 +170,7 @@ export const contentToolDefinitions = [
                 y: { type: 'number', description: 'Y position in mm' },
                 width: { type: 'number', description: 'Width in mm' },
                 height: { type: 'number', description: 'Height in mm' },
+                pageIndex: { type: 'number', description: 'Page index (0-based). Omit to use the active page in InDesign.' },
                 fillColor: { type: 'string', description: 'Fill color (RGB hex or swatch name)' },
                 strokeColor: { type: 'string', description: 'Stroke color' },
                 strokeWidth: { type: 'number', description: 'Stroke width in points', default: 1 },
@@ -175,7 +180,7 @@ export const contentToolDefinitions = [
     },
     {
         name: 'create_polygon',
-        description: 'Create a polygon on the active page',
+        description: 'Create a polygon on the specified page (defaults to active page in InDesign UI)',
         inputSchema: {
             type: 'object',
             properties: {
@@ -183,6 +188,7 @@ export const contentToolDefinitions = [
                 y: { type: 'number', description: 'Y position in mm' },
                 width: { type: 'number', description: 'Width in mm' },
                 height: { type: 'number', description: 'Height in mm' },
+                pageIndex: { type: 'number', description: 'Page index (0-based). Omit to use the active page in InDesign.' },
                 sides: { type: 'number', description: 'Number of sides', default: 6 },
                 fillColor: { type: 'string', description: 'Fill color (RGB hex or swatch name)' },
                 strokeColor: { type: 'string', description: 'Stroke color' },

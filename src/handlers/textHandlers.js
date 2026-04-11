@@ -16,6 +16,7 @@ export class TextHandlers {
             y,
             width,
             height,
+            pageIndex = null,
             fontSize = 12,
             fontName = 'Arial\\tRegular',
             textColor = 'Black',
@@ -24,28 +25,34 @@ export class TextHandlers {
             characterStyle = null
         } = args;
 
-        // Use session manager for positioning if coordinates not provided
-        const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
-
-        // Validate positioning before creating content
-        const validation = sessionManager.validatePositioning(positioning.x, positioning.y, positioning.width, positioning.height);
-        if (!validation.valid) {
-            // Apply suggested corrections if available, otherwise use safe defaults
-            if (validation.suggested) {
-                Object.assign(positioning, validation.suggested);
-            } else {
-                // Fallback to safe positioning
-                const safePos = sessionManager.getCalculatedPositioning({});
-                Object.assign(positioning, safePos);
-            }
-        }
+        // H5: skip stale sessionManager validation when caller provides explicit coordinates
+        const hasAllCoords = x !== undefined && y !== undefined && width !== undefined && height !== undefined;
+        const positioning = hasAllCoords
+            ? { x, y, width, height }
+            : (() => {
+                const pos = sessionManager.getCalculatedPositioning({ x, y, width, height });
+                const validation = sessionManager.validatePositioning(pos.x, pos.y, pos.width, pos.height);
+                if (!validation.valid) {
+                    if (validation.suggested) Object.assign(pos, validation.suggested);
+                    else Object.assign(pos, sessionManager.getCalculatedPositioning({}));
+                }
+                return pos;
+            })();
 
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            const page = doc.pages.item(0);
+            const _pi = ${JSON.stringify(pageIndex)};
+            let page;
+            if (_pi !== null) {
+                if (_pi < 0 || _pi >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+                page = doc.pages.item(_pi);
+            } else {
+                try { page = doc.activePage; if (!page || !page.isValid) page = doc.pages.item(0); }
+                catch(e) { page = doc.pages.item(0); }
+            }
             const frame = page.textFrames.add();
             frame.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];
             frame.contents = ${JSON.stringify(content)};
@@ -192,19 +199,30 @@ export class TextHandlers {
             y,
             width,
             height,
+            pageIndex = null,
             headerRows = 1,
             headerColumns = 0
         } = args;
 
-        // Use session manager for positioning if coordinates not provided
-        const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
+        const hasAllCoords = x !== undefined && y !== undefined && width !== undefined && height !== undefined;
+        const positioning = hasAllCoords
+            ? { x, y, width, height }
+            : sessionManager.getCalculatedPositioning({ x, y, width, height });
 
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            const page = doc.pages.item(0);
+            const _pi = ${JSON.stringify(pageIndex)};
+            let page;
+            if (_pi !== null) {
+                if (_pi < 0 || _pi >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+                page = doc.pages.item(_pi);
+            } else {
+                try { page = doc.activePage; if (!page || !page.isValid) page = doc.pages.item(0); }
+                catch(e) { page = doc.pages.item(0); }
+            }
 
             try {
                 const textFrame = page.textFrames.add();

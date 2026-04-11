@@ -15,34 +15,40 @@ export class GraphicsHandlers {
             y,
             width,
             height,
+            pageIndex = null,
             fillColor,
             strokeColor,
             strokeWidth = 1,
             cornerRadius = 0
         } = args;
 
-        // Use session manager for positioning if coordinates not provided
-        const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
-
-        // Validate positioning before creating content
-        const validation = sessionManager.validatePositioning(positioning.x, positioning.y, positioning.width, positioning.height);
-        if (!validation.valid) {
-            // Apply suggested corrections if available, otherwise use safe defaults
-            if (validation.suggested) {
-                Object.assign(positioning, validation.suggested);
-            } else {
-                // Fallback to safe positioning
-                const safePos = sessionManager.getCalculatedPositioning({});
-                Object.assign(positioning, safePos);
-            }
-        }
+        const hasAllCoords = x !== undefined && y !== undefined && width !== undefined && height !== undefined;
+        const positioning = hasAllCoords
+            ? { x, y, width, height }
+            : (() => {
+                const pos = sessionManager.getCalculatedPositioning({ x, y, width, height });
+                const validation = sessionManager.validatePositioning(pos.x, pos.y, pos.width, pos.height);
+                if (!validation.valid) {
+                    if (validation.suggested) Object.assign(pos, validation.suggested);
+                    else Object.assign(pos, sessionManager.getCalculatedPositioning({}));
+                }
+                return pos;
+            })();
 
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            const page = doc.pages.item(0);
+            const _pi = ${JSON.stringify(pageIndex)};
+            let page;
+            if (_pi !== null) {
+                if (_pi < 0 || _pi >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+                page = doc.pages.item(_pi);
+            } else {
+                try { page = doc.activePage; if (!page || !page.isValid) page = doc.pages.item(0); }
+                catch(e) { page = doc.pages.item(0); }
+            }
 
             try {
                 const rect = page.rectangles.add();
@@ -100,33 +106,39 @@ export class GraphicsHandlers {
             y,
             width,
             height,
+            pageIndex = null,
             fillColor,
             strokeColor,
             strokeWidth = 1
         } = args;
 
-        // Use session manager for positioning if coordinates not provided
-        const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
-
-        // Validate positioning before creating content
-        const validation = sessionManager.validatePositioning(positioning.x, positioning.y, positioning.width, positioning.height);
-        if (!validation.valid) {
-            // Apply suggested corrections if available, otherwise use safe defaults
-            if (validation.suggested) {
-                Object.assign(positioning, validation.suggested);
-            } else {
-                // Fallback to safe positioning
-                const safePos = sessionManager.getCalculatedPositioning({});
-                Object.assign(positioning, safePos);
-            }
-        }
+        const hasAllCoords = x !== undefined && y !== undefined && width !== undefined && height !== undefined;
+        const positioning = hasAllCoords
+            ? { x, y, width, height }
+            : (() => {
+                const pos = sessionManager.getCalculatedPositioning({ x, y, width, height });
+                const validation = sessionManager.validatePositioning(pos.x, pos.y, pos.width, pos.height);
+                if (!validation.valid) {
+                    if (validation.suggested) Object.assign(pos, validation.suggested);
+                    else Object.assign(pos, sessionManager.getCalculatedPositioning({}));
+                }
+                return pos;
+            })();
 
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            const page = doc.pages.item(0);
+            const _pi = ${JSON.stringify(pageIndex)};
+            let page;
+            if (_pi !== null) {
+                if (_pi < 0 || _pi >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+                page = doc.pages.item(_pi);
+            } else {
+                try { page = doc.activePage; if (!page || !page.isValid) page = doc.pages.item(0); }
+                catch(e) { page = doc.pages.item(0); }
+            }
 
             try {
                 const ellipse = page.ovals.add();
@@ -175,21 +187,32 @@ export class GraphicsHandlers {
             y,
             width,
             height,
+            pageIndex = null,
             sides = 6,
             fillColor,
             strokeColor,
             strokeWidth = 1
         } = args;
 
-        // Use session manager for positioning if coordinates not provided
-        const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
+        const hasAllCoords = x !== undefined && y !== undefined && width !== undefined && height !== undefined;
+        const positioning = hasAllCoords
+            ? { x, y, width, height }
+            : sessionManager.getCalculatedPositioning({ x, y, width, height });
 
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            const page = doc.pages.item(0);
+            const _pi = ${JSON.stringify(pageIndex)};
+            let page;
+            if (_pi !== null) {
+                if (_pi < 0 || _pi >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+                page = doc.pages.item(_pi);
+            } else {
+                try { page = doc.activePage; if (!page || !page.isValid) page = doc.pages.item(0); }
+                catch(e) { page = doc.pages.item(0); }
+            }
 
             try {
                 const polygon = page.polygons.add();
@@ -241,17 +264,29 @@ export class GraphicsHandlers {
             y,
             width,
             height,
+            pageIndex = null,
             applyObjectStyle = ''
         } = args;
 
-        const positioning = sessionManager.getCalculatedPositioning({ x, y, width, height });
+        const hasAllCoords = x !== undefined && y !== undefined && width !== undefined && height !== undefined;
+        const positioning = hasAllCoords
+            ? { x, y, width, height }
+            : sessionManager.getCalculatedPositioning({ x, y, width, height });
 
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            const page = doc.pages.item(0);
+            const _pi = ${JSON.stringify(pageIndex)};
+            let page;
+            if (_pi !== null) {
+                if (_pi < 0 || _pi >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+                page = doc.pages.item(_pi);
+            } else {
+                try { page = doc.activePage; if (!page || !page.isValid) page = doc.pages.item(0); }
+                catch(e) { page = doc.pages.item(0); }
+            }
             const rect = page.rectangles.add();
             rect.geometricBounds = [${positioning.y}, ${positioning.x}, ${positioning.y + positioning.height}, ${positioning.x + positioning.width}];
 

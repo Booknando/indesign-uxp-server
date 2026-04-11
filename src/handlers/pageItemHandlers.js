@@ -66,7 +66,7 @@ export class PageItemHandlers {
             if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const { SelectionOptions } = require('indesign');
             const item = page.allPageItems.item(${itemIndex});
-            item.select(SelectionOptions.${uxpSelection});
+            item.select(SelectionOptions[${JSON.stringify(uxpSelection)}]);
             return { success: true, id: item.id };
         `;
 

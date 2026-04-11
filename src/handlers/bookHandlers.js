@@ -396,7 +396,7 @@ export class BookHandlers {
             const { PrinterPresetTypes } = require('indesign');
             try {
                 const book = await app.open(${JSON.stringify(bookPath)});
-                await book.print(${printDialog}, PrinterPresetTypes.${printerPreset});
+                await book.print(${printDialog}, PrinterPresetTypes[${JSON.stringify(printerPreset)}]);
                 await book.close();
                 return { success: true, message: 'Book print job sent successfully' };
             } catch(e) {

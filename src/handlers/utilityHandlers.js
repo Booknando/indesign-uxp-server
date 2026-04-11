@@ -10,7 +10,14 @@ export class UtilityHandlers {
      * Execute custom InDesign code via UXP
      */
     static async executeInDesignCode(args) {
-        const { code } = args;
+        const { code, dangerousConfirmation } = args;
+
+        if (dangerousConfirmation !== 'I understand this executes arbitrary InDesign code') {
+            return formatErrorResponse(
+                'execute_indesign_code requires dangerousConfirmation: "I understand this executes arbitrary InDesign code"',
+                "Execute InDesign Code"
+            );
+        }
 
         // Pass user code directly through to UXP — it runs async with app in scope
         const result = await ScriptExecutor.executeViaUXP(code);

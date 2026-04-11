@@ -193,12 +193,23 @@ export class DocumentHandlers {
     static async saveDocument(args) {
         const { filePath } = args;
 
+        // M6: calling doc.save() with no path on a never-saved document opens a system
+        // dialog that blocks the UXP event loop until dismissed. Require filePath if unsaved.
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            ${filePath ? `await doc.save(new File(${JSON.stringify(filePath)}));` : `await doc.save();`}
+            ${filePath
+                ? `await doc.save(new File(${JSON.stringify(filePath)}));`
+                : `
+            let savedPath = null;
+            try { const fp = await doc.filePath; savedPath = fp ? String(fp) : null; } catch(e) {}
+            if (!savedPath || savedPath === 'null') {
+                return { success: false, error: 'Document has never been saved. Provide a filePath to save to a new location.' };
+            }
+            await doc.save();`
+            }
             return { success: true, message: 'Document saved' };
         `;
 
@@ -211,7 +222,13 @@ export class DocumentHandlers {
     /**
      * Close the active document
      */
-    static async closeDocument() {
+    static async closeDocument(args = {}) {
+        const { saveOptions = 'ASK' } = args;
+
+        // H6: previous implementation always used SaveOptions.no, silently discarding
+        // unsaved changes. Now requires explicit intent via saveOptions parameter.
+        // 'ASK' (default) opens InDesign's native save dialog.
+        // 'SAVE' saves before closing. 'DISCARD' explicitly discards changes.
         const code = `
             if (app.documents.length === 0) {
                 return { success: false, error: 'No document to close' };
@@ -225,8 +242,10 @@ export class DocumentHandlers {
                 return { success: false, error: 'No document to close' };
             }
             const docName = doc.name;
-            await doc.close(SaveOptions.no);
-            return { success: true, message: 'Document closed successfully: ' + docName };
+            const optMap = { ASK: SaveOptions.ask, SAVE: SaveOptions.yes, DISCARD: SaveOptions.no };
+            const opt = optMap[${JSON.stringify(saveOptions)}] || SaveOptions.ask;
+            await doc.close(opt);
+            return { success: true, message: 'Document closed: ' + docName };
         `;
 
         const result = await ScriptExecutor.executeViaUXP(code);
@@ -269,7 +288,7 @@ export class DocumentHandlers {
                 return { success: false, error: 'No document open' };
             }
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) {
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) {
                 return { success: false, error: 'Page index out of range' };
             }
             const page = doc.pages.item(${pageIndex});

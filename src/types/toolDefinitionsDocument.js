@@ -56,8 +56,18 @@ export const documentToolDefinitions = [
     },
     {
         name: 'close_document',
-        description: 'Close the active document',
-        inputSchema: { type: 'object', properties: {} },
+        description: 'Close the active document. Use saveOptions to control unsaved-changes behavior.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                saveOptions: {
+                    type: 'string',
+                    enum: ['ASK', 'SAVE', 'DISCARD'],
+                    description: 'What to do with unsaved changes. ASK (default) opens InDesign save dialog. SAVE saves first. DISCARD throws away changes.',
+                    default: 'ASK',
+                },
+            },
+        },
     },
 
     // =================== DOCUMENT ADVANCED TOOLS ===================

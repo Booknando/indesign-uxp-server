@@ -14,7 +14,7 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const selection = app.selection;
             if (!selection || selection.length < 2) return { success: false, error: 'Select at least 2 items to create a group' };
             let group;
@@ -47,7 +47,7 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const { SelectionOptions } = require('indesign');
             const page = doc.pages.item(${pageIndex});
             const indices = ${JSON.stringify(itemIndices)};
@@ -96,9 +96,9 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
+            if (${groupIndex} < 0 || ${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
             const item = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
@@ -130,9 +130,9 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
+            if (${groupIndex} < 0 || ${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
             const item = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
@@ -175,16 +175,16 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
+            if (${groupIndex} < 0 || ${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
             const group = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
                 isGroup = typeof group.pageItems !== 'undefined' || group.constructor?.name === 'Group';
             } catch(e) {}
             if (!isGroup) return { success: false, error: 'Selected item is not a group' };
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Item index out of range' };
             const item = page.allPageItems.item(${itemIndex});
             try {
                 group.add(item);
@@ -209,9 +209,9 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
+            if (${groupIndex} < 0 || ${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
             const group = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {
@@ -220,7 +220,7 @@ export class GroupHandlers {
             if (!isGroup) return { success: false, error: 'Selected item is not a group' };
             let groupItems;
             try { groupItems = group.allPageItems; } catch(e) { return { success: false, error: 'Cannot access group items' }; }
-            if (${itemIndex} >= groupItems.length) return { success: false, error: 'Item index out of range in group' };
+            if (${itemIndex} < 0 || ${itemIndex} >= groupItems.length) return { success: false, error: 'Item index out of range in group' };
             const item = groupItems.item(${itemIndex});
             const itemId = item.id;
             try {
@@ -246,7 +246,7 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             const groups = [];
             for (let i = 0; i < page.allPageItems.length; i++) {
@@ -287,9 +287,9 @@ export class GroupHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
+            if (${groupIndex} < 0 || ${groupIndex} >= page.allPageItems.length) return { success: false, error: 'Group index out of range' };
             const group = page.allPageItems.item(${groupIndex});
             let isGroup = false;
             try {

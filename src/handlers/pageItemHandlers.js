@@ -14,9 +14,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const item = page.allPageItems.item(${itemIndex});
             let type = 'Unknown';
             try { type = item.constructor?.name || 'Unknown'; } catch(e) {}
@@ -61,9 +61,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const { SelectionOptions } = require('indesign');
             const item = page.allPageItems.item(${itemIndex});
             item.select(SelectionOptions[${JSON.stringify(uxpSelection)}]);
@@ -85,9 +85,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const item = page.allPageItems.item(${itemIndex});
             item.move([${x}, ${y}]);
             return { success: true, id: item.id, geometricBounds: item.geometricBounds };
@@ -121,9 +121,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const { CoordinateSpaces, AnchorPoint, ResizeMethods } = require('indesign');
             const item = page.allPageItems.item(${itemIndex});
             item.resize(CoordinateSpaces.pasteboardCoordinates, AnchorPoint.${uxpAnchor}, ResizeMethods.replacingCurrentDimensionsWith, [${width}, ${height}]);
@@ -145,9 +145,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const item = page.allPageItems.item(${itemIndex});
             if (${JSON.stringify(fillColor)} !== null && ${JSON.stringify(fillColor)} !== undefined) {
                 try { item.fillColor = doc.colors.itemByName(${JSON.stringify(fillColor)}); } catch(e) {}
@@ -182,9 +182,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const item = page.allPageItems.item(${itemIndex});
             const newItem = item.duplicate();
             newItem.move([${x}, ${y}]);
@@ -206,9 +206,9 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
-            if (${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
+            if (${itemIndex} < 0 || ${itemIndex} >= page.allPageItems.length) return { success: false, error: 'Page item index out of range' };
             const item = page.allPageItems.item(${itemIndex});
             const id = item.id;
             item.remove();
@@ -230,7 +230,7 @@ export class PageItemHandlers {
         const code = `
             if (app.documents.length === 0) return { success: false, error: 'No document open' };
             const doc = app.activeDocument;
-            if (${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
+            if (${pageIndex} < 0 || ${pageIndex} >= doc.pages.length) return { success: false, error: 'Page index out of range' };
             const page = doc.pages.item(${pageIndex});
             const items = [];
             for (let i = 0; i < page.allPageItems.length; i++) {

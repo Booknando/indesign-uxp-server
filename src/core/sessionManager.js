@@ -2,6 +2,20 @@
  * Enhanced Session management for InDesign MCP Server
  * Stores page dimensions and other session-specific data with improved validation and error handling
  */
+
+// Recursively strip prototype-polluting keys (__proto__, constructor, prototype) from
+// an object parsed from untrusted JSON, preventing prototype pollution via importSession (M3).
+function stripDangerousKeys(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+    const safe = {};
+    for (const key of Object.keys(obj)) {
+        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+            safe[key] = stripDangerousKeys(obj[key]);
+        }
+    }
+    return safe;
+}
+
 export class SessionManager extends EventTarget {
     constructor(config = {}) {
         super();
@@ -289,9 +303,18 @@ export class SessionManager extends EventTarget {
         try {
             const imported = JSON.parse(sessionString);
             if (imported.version && imported.sessionData) {
-                this.sessionData = { ...imported.sessionData };
+                this.sessionData = { ...stripDangerousKeys(imported.sessionData) };
                 if (imported.config) {
-                    this.config = { ...this.config, ...imported.config };
+                    // Only copy keys that already exist in this.config (allowlist) to prevent
+                    // injection of unknown config fields alongside prototype pollution (M3)
+                    const safeConfig = stripDangerousKeys(imported.config);
+                    const allowedConfig = {};
+                    for (const key of Object.keys(this.config)) {
+                        if (Object.prototype.hasOwnProperty.call(safeConfig, key)) {
+                            allowedConfig[key] = safeConfig[key];
+                        }
+                    }
+                    this.config = { ...this.config, ...allowedConfig };
                 }
                 this.dispatchEvent(new CustomEvent('sessionImported', {
                     detail: { version: imported.version }

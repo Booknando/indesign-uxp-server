@@ -48,6 +48,22 @@ export class ExportHandlers {
 
         const formatLower = format.toLowerCase();
 
+        // M4: validate pageRange entries before sending to UXP — invalid entries were
+        // silently skipped, returning a count lower than expected with no error reported
+        if (pageRange !== 'all') {
+            const entries = pageRange.split(',');
+            const invalid = entries.filter(p => {
+                const n = parseInt(p.trim(), 10);
+                return isNaN(n) || n < 1;
+            });
+            if (invalid.length > 0) {
+                return formatErrorResponse(
+                    `Invalid page range entries (must be positive integers): ${invalid.join(', ')}`,
+                    "Export Images"
+                );
+            }
+        }
+
         const code = `
             const { ExportFormat } = require('indesign');
             if (app.documents.length === 0) {

@@ -6,8 +6,27 @@ const WS_PORT = 3001;
 const HTTP_PORT = 3000;
 const TIMEOUT_MS = 30000;
 
+// L1: Optional auth token — set BRIDGE_TOKEN env var to require Bearer auth on /execute.
+// Without it the bridge is open to any local process; token is recommended for shared machines.
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN || null;
+if (!BRIDGE_TOKEN) {
+  console.warn('[Bridge] WARNING: BRIDGE_TOKEN not set. Any local process can send InDesign commands.');
+  console.warn('[Bridge]   To enable auth: export BRIDGE_TOKEN="$(openssl rand -hex 32)" before starting.');
+}
+
 const app = express();
 app.use(express.json());
+
+// Auth middleware — only applied when BRIDGE_TOKEN is configured
+if (BRIDGE_TOKEN) {
+  app.use('/execute', (req, res, next) => {
+    const auth = req.headers['authorization'];
+    if (!auth || auth !== `Bearer ${BRIDGE_TOKEN}`) {
+      return res.status(401).json({ error: 'Unauthorized: missing or invalid BRIDGE_TOKEN' });
+    }
+    next();
+  });
+}
 
 let pluginSocket = null;
 const pending = new Map(); // id -> { resolve, reject, timer }
